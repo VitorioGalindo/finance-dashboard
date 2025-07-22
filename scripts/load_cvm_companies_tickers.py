@@ -104,7 +104,7 @@ def load_companies_and_tickers(csv_file_path):
                         INSERT INTO tickers (ticker, company_cnpj, is_active, created_at, updated_at)
                         VALUES (%s, %s, TRUE, NOW(), NOW())
                         ON CONFLICT (ticker) DO NOTHING; -- Evita duplicados de ticker
-                        \"\"\",
+                        """,
                         (codigo_neg.strip(), cnpj) # Usar strip() para remover espaços em branco
                     )
                     conn.commit() # Commita a inserção do ticker
