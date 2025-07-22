@@ -53,9 +53,7 @@ def load_companies_and_tickers(csv_file_path):
 
         # Ler o arquivo CSV
         # Tentando múltiplos encodings comuns em arquivos brasileiros
-         try:
-            # Tentando múltiplos encodings comuns em arquivos brasileiros
-            try:
+        try:
                 df = pd.read_csv(csv_file_path, sep=';', encoding='utf-8')
                 print("CSV read with utf-8 encoding.")
             except UnicodeDecodeError:
