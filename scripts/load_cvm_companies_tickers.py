@@ -53,28 +53,13 @@ def load_companies_and_tickers(csv_file_path):
 
         # Ler o arquivo CSV
         try:
-            # Tentando múltiplos encodings comuns em arquivos brasileiros
-            try:
-                df = pd.read_csv(csv_file_path, sep=';', encoding='utf-8')
-                print("CSV read with utf-8 encoding.")
-            except UnicodeDecodeError:
-                try:
-                    df = pd.read_csv(csv_file_path, sep=';', encoding='ISO-8859-1')
-                    print("CSV read with ISO-8859-1 encoding.")
-                except UnicodeDecodeError:
-                    try:
-                        df = pd.read_csv(csv_file_path, sep=';', encoding='latin1')
-                        print("CSV read with latin1 encoding.")
-                    except UnicodeDecodeError:
-                        df = pd.read_csv(csv_file_path, sep=';', encoding='cp1252')
-                        print("CSV read with cp1252 encoding.")
-            # Adicione mais 'except UnicodeDecodeError' aqui se precisar tentar outras codificações
+            df = pd.read_csv(csv_file_path, sep=';', encoding='latin-1', dtype=str)
+            print("CSV read with latin-1 encoding and dtype=str.")
 
         except FileNotFoundError:
             print(f"Erro: Arquivo CSV não encontrado em {csv_file_path}")
             return
         except Exception as e:
-            # Este catch agora só pega erros que não são UnicodeDecodeError nas tentativas acima
             print(f"Erro ao ler arquivo CSV: {e}")
             return
 
