@@ -109,19 +109,19 @@ def load_companies_and_tickers(csv_file_path):
                     )
                     conn.commit() # Commita a inserção do ticker
                  except Exception as e:
-                    print(f\"Erro ao inserir ticker {codigo_neg} para empresa {cnpj}: {e}\")
+                    print(f"Erro ao inserir ticker {codigo_neg} para empresa {cnpj}: {e}")
                     conn.rollback() # Rollback em caso de erro no ticker
             else:
-                 # print(f\"Skipping ticker insertion for company {cnpj}: Codigo_Negociacao is null or empty.\")
+                 # print(f"Skipping ticker insertion for company {cnpj}: Codigo_Negociacao is null or empty.")
                  pass # Ignora linhas sem código de negociação
 
 
-        print(\"Carga inicial de dados de empresas e tickers concluída.\")
+        print(f"Carga inicial de dados de empresas e tickers concluída.")
 
     except psycopg2.OperationalError as e:
-        print(f\"Erro de conexão ao banco de dados: {e}\")
+        print(f"Erro de conexão ao banco de dados: {e}")
     except Exception as e:
-        print(f\"Ocorreu um erro: {e}\")
+        print(f"Ocorreu um erro: {e}")
 
     finally:
         # Fechar conexão
@@ -131,7 +131,7 @@ def load_companies_and_tickers(csv_file_path):
             conn.close()
 
 # Executar o processo
-if __name__ == \"__main__\": # Adicionado para permitir importação sem execução imediata
+if __name__ == "__main__": # Adicionado para permitir importação sem execução imediata
     downloaded_csv_path = download_and_extract_csv(cvm_zip_url, csv_file_name)
     if downloaded_csv_path:
         load_companies_and_tickers(downloaded_csv_path)
