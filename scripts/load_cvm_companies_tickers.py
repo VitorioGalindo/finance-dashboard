@@ -48,7 +48,13 @@ def load_companies_and_tickers(csv_file_path):
     cur = None
     try:
         # Conectar ao banco de dados
-        conn = psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASSWORD)
+        conn = psycopg2.connect(
+           host=DB_HOST, 
+           database=DB_NAME, 
+           user=DB_USER, 
+           password=DB_PASSWORD,
+           client_encoding='utf8'  # <--- Adicione esta linha
+        )
         cur = conn.cursor()
 
         # Ler o arquivo CSV
