@@ -18,10 +18,9 @@ def get_companies():
         # Itera sobre cada empresa para encontrar a que causa o erro
         for i, company in enumerate(companies):
             try:
-                # Tenta criar o dicionário. O problema geralmente ocorre quando 'jsonify'
-                # tenta ler 'company.name'. Vamos forçar a leitura aqui para depurar.
-                
+                # Força a leitura do nome da empresa para acionar o erro de decodificação aqui
                 current_name = company.name
+                
                 # Imprime no log do console do Flask para vermos o progresso
                 print(f"Processando [{i+1}/{len(companies)}]: CNPJ={company.cnpj}, Name='{current_name}'", file=sys.stderr)
                 
@@ -45,9 +44,8 @@ def get_companies():
 
 ", file=sys.stderr)
                 
-                # Retorna um erro imediatamente para sabermos que encontramos o problema
                 return jsonify({
-                    "error": "Erro de codificação detectado em uma empresa específica. Verifique o log do console do Flask.",
+                    "error": "Erro de codificação detectado. Verifique o log do console do Flask.",
                     "cnpj_problematico": company.cnpj,
                     "detalhe_erro": str(e_inner)
                 }), 500
