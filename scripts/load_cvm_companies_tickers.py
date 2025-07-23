@@ -6,24 +6,20 @@ import zipfile
 import io
 from dotenv import load_dotenv
 from datetime import datetime
-import psycopg2 # Importar psycopg2 para o caso de usar cursor diretamente
+import psycopg2 # Importar psycopg2 para a conexão direta
 
-def get_db_engine_vm():
-    """Lê as credenciais do .env e cria uma engine de conexão para o RDS."""
+def get_db_connection_string():
+    """Lê as credenciais do .env e cria uma string de conexão para o RDS."""
     load_dotenv()
     user = os.getenv("DB_USER")
     password = os.getenv("DB_PASSWORD")
     host = os.getenv("DB_HOST")
     dbname = os.getenv("DB_NAME", "postgres")
-    if not all([user, password, host]):
-        raise ValueError("Credenciais do banco não encontradas no arquivo .env")
-    # Usando psycopg2 diretamente para a connection string para melhor compatibilidade
-    conn_str_with_encoding = f"{db_connection_str}&client_encoding=latin1" # Adiciona o encoding AQUI
-    conn = psycopg2.connect(conn_str_with_encoding)
-    cur = conn.cursor()
-    # Podemos usar create_engine para outras operações se necessário, mas para inserts em loop, psycopg2 é comum.
-    # Vamos retornar a connection string e usar psycopg2.connect diretamente na função de carga.
-    return conn_str
+    if not all([user, password, host, dbname]): # Adicionado dbname na verificação
+        raise ValueError("Credenciais do banco de dados (DB_USER, DB_PASSWORD, DB_HOST, DB_NAME) não encontradas nas variáveis de ambiente ou arquivo .env")
+    
+    # Retorna a string de conexão base
+    return f"postgresql://{user}:{password}@{host}/{dbname}?sslmode=require"
 
 def run_company_list_pipeline():
     """
@@ -32,8 +28,8 @@ def run_company_list_pipeline():
     """
     print("--- INICIANDO PIPELINE DE CARGA DE EMPRESAS E TICKERS ---")
     
-    # Obtém a connection string do banco
-    db_connection_str = get_db_engine_vm() # Esta função retorna a string sem client_encoding
+    # Obtém a string de conexão base
+    base_connection_str = get_db_connection_string()
     
     conn = None
     cur = None
@@ -53,6 +49,7 @@ def run_company_list_pipeline():
                 raise FileNotFoundError(f"Arquivo '{arquivo_csv}' não encontrado no ZIP.")
 
             with z.open(arquivo_csv) as f:
+                # Lendo CSV com encoding='latin-1' e dtype=str, que já sabemos que funciona
                 df = pd.read_csv(f, sep=';', encoding='latin-1', dtype=str)
 
         print("Dados extraídos com sucesso. Aplicando filtros...")
@@ -69,8 +66,11 @@ def run_company_list_pipeline():
 
         # --- Carga para o banco de dados (tabelas companies e tickers) ---
         print("Carregando dados nas tabelas companies e tickers...")
-
-        conn = psycopg2.connect(db_connection_str)
+        
+        # Conecta ao banco de dados, especificando client_encoding=latin1 na conexão psycopg2
+        # Isso informa ao PostgreSQL que os dados que estamos ENVIANDO são latin1
+        # para que ele possa convertê-los corretamente para UTF8 (seu DB default)
+        conn = psycopg2.connect(f"{base_connection_str}&client_encoding=latin1")
         cur = conn.cursor()
 
         # Iterar sobre as linhas do DataFrame filtrado
