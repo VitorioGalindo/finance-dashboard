@@ -15,7 +15,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from backend.config import get_db_engine
-from backend.models import CvmDadosFinanceiros, Company
+from backend.models import FinancialStatement, Company
 
 # Configuração do logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -98,23 +98,21 @@ def load_data(session, df, batch_size=10000):
     start_time_total = time.time()
     
     # Prepara as colunas de data
-    df['DT_REFER'] = pd.to_datetime(df['DT_REFER'], errors='coerce')
-    df['DT_INI_EXERC'] = pd.to_datetime(df['DT_INI_EXERC'], errors='coerce')
-    df['DT_FIM_EXERC'] = pd.to_datetime(df['DT_FIM_EXERC'], errors='coerce')
+    df['dt_refer'] = pd.to_datetime(df['dt_refer'], errors='coerce')
+    df['dt_ini_exerc'] = pd.to_datetime(df['dt_ini_exerc'], errors='coerce')
+    df['dt_fim_exerc'] = pd.to_datetime(df['dt_fim_exerc'], errors='coerce')
 
     # Itera sobre o DataFrame em lotes
-    for start in range(0, total_rows, batch_size):
+    for start in tqdm(range(0, total_rows, batch_size), desc="Carregando dados para o BD"):
         end = min(start + batch_size, total_rows)
         batch_df = df.iloc[start:end]
-        
-        logging.info(f"Processando lote: {start+1}-{end} de {total_rows}")
         
         # Converte o lote para uma lista de dicionários
         data_to_insert = batch_df.to_dict(orient='records')
         
         try:
             # Usa bulk_insert_mappings para eficiência
-            session.bulk_insert_mappings(CvmDadosFinanceiros, data_to_insert)
+            session.bulk_insert_mappings(FinancialStatement, data_to_insert)
             session.commit()
         except Exception as e:
             logging.error(f"ERRO ao inserir o lote {start+1}-{end}: {e}")
@@ -144,19 +142,13 @@ def process_historical_financial_reports():
         for doc in doc_types:
             file_url = f"{doc['url_base']}dfp_cia_aberta_{year}.zip" if doc['type'] == 'DFP' else f"{doc['url_base']}itr_cia_aberta_{year}.zip"
             
-            # Condição especial para ITR, que tem nomes de arquivos diferentes
-            if doc['type'] == 'ITR':
-                file_url = f"{doc['url_base']}itr_cia_aberta_{year}.zip"
-                # Adicionar os arquivos consolidados BPA, BPP, DFC_MD, DFC_MI, DMPL, DRE, DVA
-                for report_type in ['BPA', 'BPP', 'DFC_MD', 'DFC_MI', 'DMPL', 'DRE', 'DVA']:
-                    file_name = f"itr_cia_aberta_{report_type}_con_{year}.csv"
-                    # Aqui, a lógica de download precisaria ser ajustada para arquivos CSV individuais
-                    # Por simplicidade, vamos manter o ZIP por enquanto, mas cientes da estrutura.
-                    
             df = download_and_process_file(file_url, doc['type'], year)
             if df is not None:
                 # Adiciona uma coluna para identificar o tipo de demonstrativo (DFP/ITR)
-                df['TIPO_DEMONSTRACAO'] = df['GRUPO_DFP'].apply(lambda x: x.split(' - ')[1] if ' - ' in x else x)
+                if 'GRUPO_DFP' in df.columns:
+                    df['TIPO_DEMONSTRACAO'] = df['GRUPO_DFP'].apply(lambda x: x.split(' - ')[1] if ' - ' in x else x)
+                else:
+                    df['TIPO_DEMONSTRACAO'] = 'N/A' # Coluna não presente, definir um padrão
                 df['PERIODO'] = 'ANUAL' if doc['type'] == 'DFP' else 'TRIMESTRAL'
                 all_dataframes.append(df)
 
@@ -178,7 +170,6 @@ def process_historical_financial_reports():
         valid_cnpjs = {c.cnpj for c in companies}
         logging.info(f"Encontradas {len(valid_cnpjs)} empresas na tabela 'companies'.")
         
-        # Limpando e formatando o CNPJ no DataFrame
         df_consolidated['CNPJ_CIA'] = df_consolidated['CNPJ_CIA'].str.replace(r'[./-]', '', regex=True).str.zfill(14)
         
         initial_count = len(df_consolidated)
@@ -193,22 +184,19 @@ def process_historical_financial_reports():
             logging.warning("Nenhum registro corresponde a uma empresa válida. Encerrando.")
             return
 
-        # Renomear colunas para corresponder ao modelo
         df_filtered.rename(columns=COLUMN_MAPPING, inplace=True)
         
-        # Garantir que todas as colunas do modelo existam no DataFrame
-        # Adiciona colunas faltantes com None se não existirem
-        model_columns = [c.name for c in CvmDadosFinanceiros.__table__.columns if c.name != 'id']
+        model_columns = [c.name for c in FinancialStatement.__table__.columns if c.name != 'id']
         for col in model_columns:
             if col not in df_filtered.columns:
                 df_filtered[col] = None
 
-        # Manter apenas as colunas que existem no modelo
         df_final = df_filtered[model_columns]
 
         load_data(session, df_final)
                 
-        print("===============================================================================")
+        print("
+================================================================================")
         print("PROCESSO DE CARGA HISTÓRICA CONCLUÍDO COM SUCESSO!")
         print("================================================================================")
 
