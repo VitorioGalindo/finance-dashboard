@@ -48,14 +48,13 @@ def download_and_process_file(url, file_type, year):
     """Baixa um arquivo, descompacta e processa em um DataFrame."""
     try:
         logging.info(f"--> Tentando baixar {file_type} para o ano {year}...")
-        response = requests.get(url)
+        response = requests.get(url, stream=True) # Usar stream para arquivos grandes
         response.raise_for_status()
 
         logging.info("    + Download concluído. Processando...")
         zip_file = zipfile.ZipFile(io.BytesIO(response.content))
         all_dfs = []
         
-        # Encontrar todos os arquivos CSV relevantes no zip (ex: BPA, DRE, etc.)
         csv_files = [f for f in zip_file.namelist() if f.endswith('.csv')]
         if not csv_files:
             logging.warning(f"    - AVISO: Nenhum arquivo CSV encontrado no zip para o ano {year}.")
@@ -64,12 +63,13 @@ def download_and_process_file(url, file_type, year):
         for file_name in csv_files:
             with zip_file.open(file_name) as f:
                 try:
-                    df = pd.read_csv(f, sep=';', encoding='latin1', dtype={'CD_CVM': str})
+                    # Otimização: Especificar dtypes conhecidos pode acelerar a leitura
+                    df = pd.read_csv(f, sep=';', encoding='latin1', dtype={'CD_CVM': str, 'CNPJ_CIA': str})
                     all_dfs.append(df)
                 except UnicodeDecodeError:
                     logging.warning(f"    - AVISO: Falha ao ler {file_name} com latin1, tentando utf-8...")
                     f.seek(0)
-                    df = pd.read_csv(f, sep=';', encoding='utf-8', dtype={'CD_CVM': str})
+                    df = pd.read_csv(f, sep=';', encoding='utf-8', dtype={'CD_CVM': str, 'CNPJ_CIA': str})
                     all_dfs.append(df)
 
         consolidated_df = pd.concat(all_dfs, ignore_index=True)
@@ -85,7 +85,7 @@ def download_and_process_file(url, file_type, year):
         logging.error(f"    - ERRO: Falha ao processar o arquivo para o ano {year}. Detalhes: {e}")
     return None
 
-def load_data(session, df, batch_size=10000):
+def load_data(session, df, batch_size=50000): # <-- VALOR DO LOTE AUMENTADO AQUI
     """
     Carrega os dados do DataFrame para o banco de dados em lotes (batches).
     """
@@ -96,12 +96,15 @@ def load_data(session, df, batch_size=10000):
     total_rows = len(df)
     logging.info(f"Iniciando a preparação e carga de {total_rows} registros em lotes de {batch_size}...")
     
+    # Otimização: Fazer conversões de data uma única vez
     df['dt_refer'] = pd.to_datetime(df['dt_refer'], errors='coerce')
     df['dt_ini_exerc'] = pd.to_datetime(df['dt_ini_exerc'], errors='coerce')
     df['dt_fim_exerc'] = pd.to_datetime(df['dt_fim_exerc'], errors='coerce')
 
-    # Remove linhas onde datas essenciais são NaT (Not a Time) após a conversão
     df.dropna(subset=['dt_refer'], inplace=True)
+    
+    # Garantir que o total de linhas reflete o dataframe após o dropna
+    total_rows = len(df)
 
     for start in tqdm(range(0, total_rows, batch_size), desc="Carregando dados para o BD"):
         end = min(start + batch_size, total_rows)
@@ -137,8 +140,6 @@ def process_historical_financial_reports():
             df = download_and_process_file(file_url, doc['type'], year)
             if df is not None:
                 if 'GRUPO_DFP' in df.columns:
-                    # CORREÇÃO: Verifica se o valor é uma string antes de tentar usar split().
-                    # Isso evita o erro 'TypeError' em valores NaN (float).
                     df['TIPO_DEMONSTRACAO'] = df['GRUPO_DFP'].apply(
                         lambda x: x.split(' - ')[1] if isinstance(x, str) and ' - ' in x else x
                     )
@@ -189,7 +190,8 @@ def process_historical_financial_reports():
 
         df_final = df_filtered[model_columns].copy()
 
-        load_data(session, df_final)
+        # Chamada da função load_data com o novo batch_size
+        load_data(session, df_final, batch_size=50000)
                 
         print("" + "="*80)
         print("PROCESSO DE CARGA HISTÓRICA CONCLUÍDO COM SUCESSO!")
