@@ -1,7 +1,6 @@
 # scripts/etl_dadosfinanceiros.py
 import os
 import pandas as pd
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import time
@@ -10,9 +9,11 @@ import time
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Importações adiadas para depois da configuração do path
+# Importações do nosso backend
 from backend.models import FinancialStatement
 from backend.app import create_app
+# CORREÇÃO: Importa o objeto 'db' que foi centralizado no __init__.py
+from backend import db 
 
 # --- CONFIGURAÇÃO ---
 print("Iniciando o script de ETL para dados financeiros...")
@@ -34,7 +35,6 @@ def load_data(session, df):
 
     start_time = time.time()
     for index, row in df.iterrows():
-        # Cria um objeto do modelo para cada linha
         statement = FinancialStatement(
             company_cnpj=row.get('CNPJ_CIA'),
             company_name=row.get('DENOM_CIA'),
@@ -50,9 +50,7 @@ def load_data(session, df):
             currency=row.get('MOEDA'),
             fiscal_year_order=row.get('ORDEM_EXERC'),
             report_type=row.get('GRUPO_DFP'),
-            # CORREÇÃO DE BUG: O campo 'periodo' estava sendo preenchido com o dado errado.
-            # Ajustado para usar a coluna correta do CSV. Assumindo que 'ORDEM_EXERC' contém essa informação.
-            period=row.get('ORDEM_EXERC') 
+            period=row.get('ORDEM_EXERC')
         )
         objects_to_load.append(statement)
 
@@ -75,8 +73,6 @@ def load_data(session, df):
 def process_financial_reports():
     """Função principal para o ETL dos dados financeiros."""
     path = './'
-    # NOTA: O nome do arquivo no script anterior continha "2024", mas o script original
-    # não especificava isso. Removi para tornar mais genérico.
     files = {
         'dre': os.path.join(path, 'DFs Consolidados - DRE/DRE_con.csv'),
     }
@@ -89,8 +85,7 @@ def process_financial_reports():
             session = Session()
 
             try:
-                # O nome da coluna no CSV que indica o tipo de grupo é 'GRUPO_DFP'
-                df = pd.read_csv(files['dre'], sep=';', encoding='latin-1', on_bad_lines='skip')
+                df = pd.read_csv(files['dre'], sep=';', encoding='latin-1', on_bad_lines='skip', low_memory=False)
                 print(f"Arquivo DRE lido com sucesso. {len(df)} linhas encontradas.")
                 
                 truncate_table(session)
