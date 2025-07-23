@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carteira Gerencial de Ações (RTD)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* bg-gray-900 */
+            color: #d1d5db; /* text-gray-300 */
+        }
+        .card { background-color: #1f2937; border-radius: 0.5rem; padding: 1.25rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+        .text-positive { color: #22c55e; }
+        .text-negative { color: #ef4444; }
+        /* Outros estilos permanecem os mesmos */
+    </style>
+</head>
+<body class="p-4 sm:p-6 lg:p-8">
+
+    <div class="max-w-full mx-auto">
+        <!-- Cabeçalho e outros elementos do dashboard -->
+        <header class="mb-6">
+            <div class="flex items-center justify-between">
+                 <h1 class="text-3xl font-bold text-white">Carteira Gerencial de Ações</h1>
+                 <div id="connection-status" class="status-indicator">
+                    <!-- Status da conexão aqui -->
+                </div>
+            </div>
+            <p class="text-gray-400 mt-1">Painel interativo para acompanhamento de portfólio via RTD.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 flex flex-col gap-6">
+                <!-- Tabela de Portfólio e Gráfico de Contribuição -->
+                <div class="card overflow-x-auto">
+                    <!-- Conteúdo da tabela -->
+                </div>
+                 <div class="card">
+                    <!-- Gráfico de contribuição -->
+                </div>
+
+                <!-- ### GRÁFICO HISTÓRICO ATUALIZADO ### -->
+                <div class="card">
+                    <h2 class="text-xl font-semibold text-white mb-4">Retorno Acumulado: Cota vs. Ibovespa</h2>
+                    <!-- MUDANÇA 1: A altura foi aumentada para melhor visualização -->
+                    <div class="relative h-[40rem]">
+                        <canvas id="historicalChart"></canvas>
+                        <div id="historical-chart-status" class="absolute inset-0 flex items-center justify-center text-gray-400">Carregando dados do gráfico...</div>
+                    </div>
+                </div>
+            </div>
+            <aside class="flex flex-col gap-6">
+                <!-- Painéis laterais (Resumo, Métricas, Adicionar Ativo) -->
+            </aside>
+        </main>
+    </div>
+
+    <!-- Modal para Análise da IA -->
+
+    <script>
+        // --- ESTADO DA APLICAÇÃO ---
+        let state = {
+            assets: [],
+            metrics: {},
+            sort: { by: 'Posição %', order: 'desc' }
+        };
+        let contributionChartInstance = null;
+        let historicalChartInstance = null;
+        
+        // --- FUNÇÕES DE RENDERIZAÇÃO E DADOS (simplificado para focar na mudança) ---
+        // ... Suas outras funções de renderização, manipulação de dados, etc. ...
+
+        /**
+         * MUDANÇA 2: Renderiza o gráfico de dados históricos com RETORNO PERCENTUAL.
+         * @param {Array<Object>} historicalData - Um array de objetos, cada um contendo 'Data', 'cota_return', e 'ibov_return'.
+         */
+        function renderHistoricalChart(historicalData) {
+            const statusEl = document.getElementById('historical-chart-status');
+            const ctx = document.getElementById('historicalChart').getContext('2d');
+
+            if (historicalChartInstance) {
+                historicalChartInstance.destroy();
+            }
+            
+            // Prepara os dados para o formato que o Chart.js espera
+            const labels = historicalData.map(d => d.Data);
+            // Multiplica por 100 para exibir como porcentagem
+            const cotaReturnData = historicalData.map(d => d.cota_return * 100);
+            const ibovReturnData = historicalData.map(d => d.ibov_return * 100);
+
+            historicalChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Retorno da Cota',
+                            data: cotaReturnData,
+                            borderColor: '#38bdf8', // Azul
+                            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            pointRadius: 0, // Oculta os pontos para um visual mais limpo
+                        },
+                        {
+                            label: 'Retorno do Ibovespa',
+                            data: ibovReturnData,
+                            borderColor: '#facc15', // Amarelo
+                            backgroundColor: 'rgba(250, 204, 21, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            pointRadius: 0,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'month',
+                                tooltipFormat: 'dd/MM/yyyy',
+                                displayFormats: {
+                                    month: 'MMM yyyy'
+                                }
+                            },
+                            ticks: { color: '#9ca3af' },
+                            grid: { color: '#374151' }
+                        },
+                        y: { // Usando um único eixo Y, pois ambos são percentuais
+                            title: {
+                                display: true,
+                                text: 'Retorno Acumulado (%)',
+                                color: '#d1d5db'
+                            },
+                            ticks: {
+                                color: '#9ca3af',
+                                // Adiciona o símbolo de '%' aos valores do eixo
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            },
+                            grid: { color: '#374151' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#d1d5db' }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                // Formata o tooltip para exibir o valor com '%'
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y.toFixed(2) + '%';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+             statusEl.classList.add('hidden');
+        }
+
+        async function fetchHistoricalData() {
+            const statusEl = document.getElementById('historical-chart-status');
+            statusEl.classList.remove('hidden');
+            statusEl.textContent = 'Carregando dados do gráfico...';
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/historical');
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(`Servidor respondeu com status ${response.status}: ${errorData.error || 'Erro desconhecido'}`);
+                }
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    renderHistoricalChart(data);
+                } else {
+                    statusEl.textContent = 'Dados históricos não encontrados. Verifique a planilha.';
+                }
+            } catch (error) {
+                console.error('Erro ao buscar dados históricos:', error);
+                statusEl.textContent = 'Erro ao carregar o gráfico. Verifique o console do servidor Python.';
+            }
+        }
+
+        // --- INICIALIZAÇÃO ---
+        function init() {
+            // Suas outras funções de inicialização (loadState, render, etc.)
+            // loadState();
+            // render();
+            // fetchRealTimePrices();
+            fetchHistoricalData(); // A função que busca os dados do gráfico
+            // setInterval(fetchRealTimePrices, 5000);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
