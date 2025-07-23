@@ -22,3 +22,28 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Ignorar a pasta do ambiente virtual Python
+.venv/
+
+# Ignorar arquivos de cache e temporários do Python
+__pycache__/
+*.pyc
+
+# Ignorar arquivos de dados gerados localmente (como o CSV baixado)
+*.csv
+*.zip
+cvm_dados_financeiros_data.dump # Exemplo de arquivo de dump
+
+# Ignorar credenciais ou arquivos de configuração sensíveis
+.env
+
+# Ignorar arquivos específicos do IDE (se houver)
+.idea/
+.vscode/
+
+# Ignorar logs
+*.log
+
+# Ignorar arquivos temporários do sistema operacional
+*.tmp
