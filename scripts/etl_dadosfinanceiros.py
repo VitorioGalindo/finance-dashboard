@@ -207,8 +207,7 @@ def process_historical_financial_reports():
         df_final = df_filtered[model_columns]
 
         load_data(session, df_final)
-        
-        print("
+                
 ================================================================================")
         print("PROCESSO DE CARGA HISTÓRICA CONCLUÍDO COM SUCESSO!")
         print("================================================================================")
