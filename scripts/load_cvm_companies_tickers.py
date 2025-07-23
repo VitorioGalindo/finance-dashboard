@@ -18,7 +18,9 @@ def get_db_engine_vm():
     if not all([user, password, host]):
         raise ValueError("Credenciais do banco não encontradas no arquivo .env")
     # Usando psycopg2 diretamente para a connection string para melhor compatibilidade
-    conn_str = f"postgresql://{user}:{password}@{host}/{dbname}?sslmode=require"
+    conn_str_with_encoding = f"{db_connection_str}&client_encoding=latin1" # Adiciona o encoding AQUI
+    conn = psycopg2.connect(conn_str_with_encoding)
+    cur = conn.cursor()
     # Podemos usar create_engine para outras operações se necessário, mas para inserts em loop, psycopg2 é comum.
     # Vamos retornar a connection string e usar psycopg2.connect diretamente na função de carga.
     return conn_str
@@ -31,7 +33,8 @@ def run_company_list_pipeline():
     print("--- INICIANDO PIPELINE DE CARGA DE EMPRESAS E TICKERS ---")
     
     # Obtém a connection string do banco
-    db_connection_str = get_db_engine_vm()
+    db_connection_str = get_db_engine_vm() # Esta função retorna a string sem client_encoding
+    
     conn = None
     cur = None
 
