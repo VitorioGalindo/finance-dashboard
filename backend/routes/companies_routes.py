@@ -1,4 +1,4 @@
-# backend/routes/companies_routes.py (VERSÃO DE DEPURAÇÃO)
+# backend/routes/companies_routes.py (VERSÃO DE DEPURAÇÃO CORRIGIDA)
 from flask import Blueprint, jsonify
 from backend.models import Company
 import sys
@@ -10,6 +10,7 @@ def get_companies():
     """Retorna uma lista de todas as empresas, com debug de codificação."""
     print("--- INICIANDO ROTA DE DEPURAÇÃO /api/companies ---", file=sys.stderr)
     try:
+        # Busca todas as empresas do banco de dados
         companies = Company.query.all()
         print(f"Banco de dados retornou {len(companies)} empresas.", file=sys.stderr)
         
@@ -22,6 +23,7 @@ def get_companies():
                 # Vamos forçar a leitura aqui para depurar.
                 
                 current_name = company.name
+                # Imprime no log do console do Flask para vermos o progresso
                 print(f"Processando [{i+1}/{len(companies)}]: CNPJ={company.cnpj}, Name='{current_name}'", file=sys.stderr)
                 
                 company_data = {
@@ -44,7 +46,11 @@ def get_companies():
 
 ", file=sys.stderr)
                 # Retorna um erro imediatamente para sabermos que encontramos o problema
-                return jsonify({"error": "Erro de codificação detectado em uma empresa específica. Verifique o log do console do Flask.", "cnpj_problematico": company.cnpj}), 500
+                return jsonify({
+                    "error": "Erro de codificação detectado em uma empresa específica. Verifique o log do console do Flask.",
+                    "cnpj_problematico": company.cnpj,
+                    "detalhe_erro": str(e_inner)
+                }), 500
 
         print("--- Processamento de todas as empresas concluído com sucesso. ---", file=sys.stderr)
         return jsonify(companies_list)
