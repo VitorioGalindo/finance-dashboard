@@ -15,7 +15,7 @@ def get_db_connection_string():
     password = os.getenv("DB_PASSWORD")
     host = os.getenv("DB_HOST")
     dbname = os.getenv("DB_NAME", "postgres")
-    if not all([user, password, host, dbname]): # Adicionado dbname na verificação
+    if not all([user, password, host, dbname]):
         raise ValueError("Credenciais do banco de dados (DB_USER, DB_PASSWORD, DB_HOST, DB_NAME) não encontradas nas variáveis de ambiente ou arquivo .env")
     
     # Retorna a string de conexão base
@@ -76,13 +76,23 @@ def run_company_list_pipeline():
         # Iterar sobre as linhas do DataFrame filtrado
         for index, row in df_filtrado.iterrows():
             cnpj = str(row['CNPJ_Companhia']).replace('.', '').replace('/', '').replace('-', '')
-            nome_emp = row['Nome_Empresarial']
+            nome_emp_original = row['Nome_Empresarial']
             codigo_neg = row['Codigo_Negociacao'].strip()
 
             if not cnpj or not codigo_neg:
-                # print(f"Skipping row {index}: CNPJ or Ticker is empty.")
                 continue
 
+            # Tentar converter o nome da empresa para UTF-8, substituindo caracteres problemáticos
+            nome_emp_cleaned = nome_emp_original
+            if nome_emp_original:
+                try:
+                    nome_emp_cleaned = nome_emp_original.encode('latin1').decode('utf-8', errors='replace')
+                except Exception as e:
+                    print(f"Erro ao forçar UTF-8 para '{nome_emp_original}': {e}. Usando original com cuidado.")
+                    # Fallback para o original se a conversão falhar, mas isso pode levar ao erro de DB
+                    # Idealmente, você investigaria esses casos específicos ou limparia ainda mais.
+                    nome_emp_cleaned = nome_emp_original
+            
             try:
                 # Inserir/Atualizar na tabela companies
                 cur.execute(
@@ -91,7 +101,7 @@ def run_company_list_pipeline():
                     VALUES (%s, %s, NOW(), NOW())
                     ON CONFLICT (cnpj) DO NOTHING;
                     """,
-                    (cnpj, nome_emp)
+                    (cnpj, nome_emp_cleaned) # <-- Usar a versão limpa aqui
                 )
 
                 # Inserir na tabela tickers
