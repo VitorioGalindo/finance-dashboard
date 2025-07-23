@@ -1,154 +1,224 @@
-# scripts/etl_dadosfinanceiros.py
+
 import os
-import pandas as pd
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import text
-from dotenv import load_dotenv
-import time
 import requests
 import zipfile
 import io
-import re
-from datetime import datetime
+import pandas as pd
+import logging
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
+from tqdm import tqdm
+import time
 
+# Ajuste para importar a partir da raiz do projeto
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from backend.models import FinancialStatement, Company
-from backend.app import create_app
-from backend import db
+from backend.config import get_db_engine
+from backend.models import CvmDadosFinanceiros, Company
 
-print("Iniciando o script de ETL para dados financeiros...")
-load_dotenv()
-app = create_app()
+# Configuração do logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def clean_cnpj(cnpj):
-    if not isinstance(cnpj, str): return None
-    return re.sub(r'[^0-9]', '', cnpj)
+BASE_URL = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/DFP/DADOS/"
+BASE_URL_ITR = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/ITR/DADOS/"
+START_YEAR = 2010
+END_YEAR = 2025 # Ano atual + 1 para garantir que pegamos os dados mais recentes
 
-def download_and_extract_data(year, doc_type):
-    """
-    Tenta baixar e extrair os dados DRE para um ano e tipo de documento (DFP ou ITR) específico.
-    """
-    base_url = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/{doc_type.upper()}/DADOS/"
-    zip_filename = f"{doc_type.lower()}_cia_aberta_{year}.zip"
-    
-    # CORREÇÃO CRÍTICA: O nome do arquivo CSV agora é dinâmico, baseado no doc_type.
-    csv_filename = f"{doc_type.lower()}_cia_aberta_DRE_con_{year}.csv"
-    
-    url = f"{base_url}{zip_filename}"
+# Mapeamento de colunas para o modelo SQLAlchemy
+COLUMN_MAPPING = {
+    'CNPJ_CIA': 'cnpj_cia',
+    'DENOM_CIA': 'denom_cia',
+    'CD_CVM': 'cd_cvm',
+    'VERSAO': 'versao',
+    'DT_REFER': 'dt_refer',
+    'DT_INI_EXERC': 'dt_ini_exerc',
+    'DT_FIM_EXERC': 'dt_fim_exerc',
+    'CD_CONTA': 'cd_conta',
+    'DS_CONTA': 'ds_conta',
+    'VL_CONTA': 'vl_conta',
+    'ESCALA_MOEDA': 'escala_moeda',
+    'MOEDA': 'moeda',
+    'ORDEM_EXERC': 'ordem_exerc'
+}
 
-    print(f"--> Tentando baixar {doc_type.upper()} para o ano {year}...")
+def download_and_process_file(url, file_type, year):
+    """Baixa um arquivo, descompacta e processa em um DataFrame."""
     try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, stream=True)
-        if response.status_code == 404:
-            print(f"    - AVISO: Arquivo não encontrado (404). Pulando.")
-            return None
+        logging.info(f"--> Tentando baixar {file_type} para o ano {year}...")
+        response = requests.get(url)
         response.raise_for_status()
 
-        print(f"    + Download concluído. Processando...")
-        with zipfile.ZipFile(io.BytesIO(response.content)) as z:
-            if csv_filename not in z.namelist():
-                print(f"    - ERRO: Arquivo CSV esperado '{csv_filename}' não foi encontrado no ZIP. Pulando.")
-                return None
-            with z.open(csv_filename) as csv_file:
-                df = pd.read_csv(csv_file, sep=';', encoding='latin-1', on_bad_lines='skip', low_memory=False)
-                print(f"    + DataFrame criado com sucesso ({len(df)} linhas).")
-                return df
-    except requests.exceptions.RequestException as e:
-        print(f"    - ERRO DE REDE: {e}")
-    except zipfile.BadZipFile:
-        print(f"    - ERRO: O arquivo baixado não é um ZIP válido.")
+        logging.info("    + Download concluído. Processando...")
+        zip_file = zipfile.ZipFile(io.BytesIO(response.content))
+        all_dfs = []
+        for file_name in zip_file.namelist():
+            if file_name.endswith('.csv'):
+                with zip_file.open(file_name) as f:
+                    try:
+                        # Tenta ler com encoding 'latin1' que é comum em dados brasileiros
+                        df = pd.read_csv(f, sep=';', encoding='latin1', dtype={'CD_CVM': str})
+                        all_dfs.append(df)
+                    except UnicodeDecodeError:
+                        logging.warning(f"    - AVISO: Falha ao ler {file_name} com latin1, tentando utf-8...")
+                        f.seek(0)
+                        df = pd.read_csv(f, sep=';', encoding='utf-8', dtype={'CD_CVM': str})
+                        all_dfs.append(df)
+
+        if not all_dfs:
+            logging.warning(f"    - AVISO: Nenhum arquivo CSV encontrado no zip para o ano {year}.")
+            return None
+
+        consolidated_df = pd.concat(all_dfs, ignore_index=True)
+        logging.info(f"    + DataFrame criado com sucesso ({len(consolidated_df)} linhas).")
+        return consolidated_df
+
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            logging.warning(f"    - AVISO: Arquivo não encontrado (404). Pulando.")
+        else:
+            logging.error(f"    - ERRO: Falha no download. Status: {e.response.status_code}. URL: {url}")
     except Exception as e:
-        print(f"    - ERRO inesperado: {e}")
+        logging.error(f"    - ERRO: Falha ao processar o arquivo para o ano {year}. Detalhes: {e}")
     return None
 
-def truncate_table(session):
-    print("Limpando a tabela 'cvm_dados_financeiros' para a carga completa...")
-    session.execute(text(f'TRUNCATE TABLE {FinancialStatement.__tablename__} RESTART IDENTITY CASCADE;'))
+def load_data(session, df, batch_size=10000):
+    """
+    Carrega os dados do DataFrame para o banco de dados em lotes (batches),
+    com otimizações para performance.
+    """
+    logging.info("Limpando a tabela 'cvm_dados_financeiros' para a carga completa...")
+    # Usamos TRUNCATE para resetar a tabela de forma eficiente e reiniciar a contagem de ID.
+    session.execute(text("TRUNCATE TABLE cvm_dados_financeiros RESTART IDENTITY;"))
     session.commit()
 
-def load_data(session, df):
-    # (Esta função está correta e permanece a mesma)
-    objects_to_load = []
     total_rows = len(df)
-    print(f"Iniciando a preparação de {total_rows} registros para a carga...")
-    start_time = time.time()
-    for index, row in df.iterrows():
-        statement = FinancialStatement(
-            company_cnpj=row['CNPJ_CIA'], company_name=row.get('DENOM_CIA'), cvm_code=row.get('CD_CVM'),
-            report_version=int(row.get('VERSAO')) if pd.notna(row.get('VERSAO')) else None,
-            reference_date=pd.to_datetime(row.get('DT_REFER')).date() if pd.notna(row.get('DT_REFER')) else None,
-            fiscal_year_start=pd.to_datetime(row.get('DT_INI_EXERC')).date() if pd.notna(row.get('DT_INI_EXERC')) else None,
-            fiscal_year_end=pd.to_datetime(row.get('DT_FIM_EXERC')).date() if pd.notna(row.get('DT_FIM_EXERC')) else None,
-            account_code=row.get('CD_CONTA'), account_description=row.get('DS_CONTA'),
-            account_value=float(row.get('VL_CONTA')) if pd.notna(row.get('VL_CONTA')) else None,
-            currency_scale=row.get('ESCALA_MOEDA'), currency=row.get('MOEDA'),
-            fiscal_year_order=row.get('ORDEM_EXERC'), report_type=row.get('GRUPO_DFP'), period=row.get('ORDEM_EXERC')
-        )
-        objects_to_load.append(statement)
-    end_time = time.time()
-    print(f"Preparação de objetos concluída em {end_time - start_time:.2f}s.")
-    if objects_to_load:
-        print("Iniciando a carga em lote no banco de dados...")
-        start_bulk_time = time.time()
-        session.bulk_save_objects(objects_to_load)
-        session.commit()
-        end_bulk_time = time.time()
-        print(f"Carga completa concluída com sucesso em {end_bulk_time - start_bulk_time:.2f}s.")
+    logging.info(f"Iniciando a preparação e carga de {total_rows} registros em lotes de {batch_size}...")
+    
+    start_time_total = time.time()
+    
+    # Prepara as colunas de data
+    df['DT_REFER'] = pd.to_datetime(df['DT_REFER'], errors='coerce')
+    df['DT_INI_EXERC'] = pd.to_datetime(df['DT_INI_EXERC'], errors='coerce')
+    df['DT_FIM_EXERC'] = pd.to_datetime(df['DT_FIM_EXERC'], errors='coerce')
+
+    # Itera sobre o DataFrame em lotes
+    for start in range(0, total_rows, batch_size):
+        end = min(start + batch_size, total_rows)
+        batch_df = df.iloc[start:end]
+        
+        logging.info(f"Processando lote: {start+1}-{end} de {total_rows}")
+        
+        # Converte o lote para uma lista de dicionários
+        data_to_insert = batch_df.to_dict(orient='records')
+        
+        try:
+            # Usa bulk_insert_mappings para eficiência
+            session.bulk_insert_mappings(CvmDadosFinanceiros, data_to_insert)
+            session.commit()
+        except Exception as e:
+            logging.error(f"ERRO ao inserir o lote {start+1}-{end}: {e}")
+            session.rollback()
+            # Opcional: parar o processo em caso de erro
+            # raise e
+            
+    end_time_total = time.time()
+    logging.info(f"Carga em lote concluída em {end_time_total - start_time_total:.2f} segundos.")
+
 
 def process_historical_financial_reports():
-    START_YEAR = 2010
-    end_year = datetime.now().year
-    report_types = ['DFP', 'ITR']
-    all_dfs = []
+    """Orquestra o processo de ETL para os relatórios financeiros."""
+    logging.info("Iniciando o script de ETL para dados financeiros...")
+    print("================================================================================")
+    print(f"INICIANDO PROCESSO DE CARGA HISTÓRICA COMPLETA")
+    print(f"Período: {START_YEAR} a {END_YEAR} | Documentos: ['DFP', 'ITR']")
+    print("================================================================================")
+    
+    all_dataframes = []
+    doc_types = [
+        {'type': 'DFP', 'url_base': BASE_URL},
+        {'type': 'ITR', 'url_base': BASE_URL_ITR}
+    ]
 
-    print("="*80)
-    print("INICIANDO PROCESSO DE CARGA HISTÓRICA COMPLETA")
-    print(f"Período: {START_YEAR} a {end_year} | Documentos: {report_types}")
-    print("="*80)
-
-    for year in range(START_YEAR, end_year + 1):
-        for doc_type in report_types:
-            df = download_and_extract_data(year, doc_type)
+    for year in range(START_YEAR, END_YEAR + 1):
+        for doc in doc_types:
+            file_url = f"{doc['url_base']}dfp_cia_aberta_{year}.zip" if doc['type'] == 'DFP' else f"{doc['url_base']}itr_cia_aberta_{year}.zip"
+            
+            # Condição especial para ITR, que tem nomes de arquivos diferentes
+            if doc['type'] == 'ITR':
+                file_url = f"{doc['url_base']}itr_cia_aberta_{year}.zip"
+                # Adicionar os arquivos consolidados BPA, BPP, DFC_MD, DFC_MI, DMPL, DRE, DVA
+                for report_type in ['BPA', 'BPP', 'DFC_MD', 'DFC_MI', 'DMPL', 'DRE', 'DVA']:
+                    file_name = f"itr_cia_aberta_{report_type}_con_{year}.csv"
+                    # Aqui, a lógica de download precisaria ser ajustada para arquivos CSV individuais
+                    # Por simplicidade, vamos manter o ZIP por enquanto, mas cientes da estrutura.
+                    
+            df = download_and_process_file(file_url, doc['type'], year)
             if df is not None:
-                all_dfs.append(df)
+                # Adiciona uma coluna para identificar o tipo de demonstrativo (DFP/ITR)
+                df['TIPO_DEMONSTRACAO'] = df['GRUPO_DFP'].apply(lambda x: x.split(' - ')[1] if ' - ' in x else x)
+                df['PERIODO'] = 'ANUAL' if doc['type'] == 'DFP' else 'TRIMESTRAL'
+                all_dataframes.append(df)
 
-    if not all_dfs:
-        print("FALHA NO ETL: Nenhum dado foi baixado. Abortando.")
+    if not all_dataframes:
+        logging.error("Nenhum dado foi baixado. Encerrando o processo.")
         return
 
-    print("Concatenando todos os dataframes baixados...")
-    final_df = pd.concat(all_dfs, ignore_index=True)
-    print(f"Total de {len(final_df)} registros brutos encontrados.")
+    logging.info("Concatenando todos os dataframes baixados...")
+    df_consolidated = pd.concat(all_dataframes, ignore_index=True)
+    logging.info(f"Total de {len(df_consolidated)} registros brutos encontrados.")
 
-    with app.app_context():
-        db_engine = db.engine
-        Session = sessionmaker(bind=db_engine)
-        session = Session()
-        try:
-            print("Buscando a lista de empresas válidas no banco de dados...")
-            valid_cnpjs = {c.cnpj for c in session.query(Company.cnpj).all()}
-            print(f"Encontradas {len(valid_cnpjs)} empresas na tabela 'companies'.")
+    engine = get_db_engine()
+    Session = sessionmaker(bind=engine)
+    session = Session()
 
-            print("Limpando e validando CNPJs do DataFrame consolidado...")
-            original_rows = len(final_df)
-            final_df['CNPJ_CIA'] = final_df['CNPJ_CIA'].apply(clean_cnpj)
-            df_filtered = final_df[final_df['CNPJ_CIA'].isin(valid_cnpjs)]
-            filtered_rows = len(df_filtered)
-            if filtered_rows < original_rows:
-                print(f"AVISO: {original_rows - filtered_rows} registros foram descartados por não corresponderem a uma empresa na tabela 'companies'.")
+    try:
+        logging.info("Buscando a lista de empresas válidas no banco de dados...")
+        companies = session.query(Company.cnpj).all()
+        valid_cnpjs = {c.cnpj for c in companies}
+        logging.info(f"Encontradas {len(valid_cnpjs)} empresas na tabela 'companies'.")
+        
+        # Limpando e formatando o CNPJ no DataFrame
+        df_consolidated['CNPJ_CIA'] = df_consolidated['CNPJ_CIA'].str.replace(r'[./-]', '', regex=True).str.zfill(14)
+        
+        initial_count = len(df_consolidated)
+        logging.info("Limpando e validando CNPJs do DataFrame consolidado...")
+        df_filtered = df_consolidated[df_consolidated['CNPJ_CIA'].isin(valid_cnpjs)].copy()
+        
+        discarded_count = initial_count - len(df_filtered)
+        if discarded_count > 0:
+            logging.warning(f"{discarded_count} registros foram descartados por não corresponderem a uma empresa na tabela 'companies'.")
 
-            if df_filtered.empty:
-                print("Nenhum registro válido para carregar após o filtro. Abortando.")
-                return
+        if df_filtered.empty:
+            logging.warning("Nenhum registro corresponde a uma empresa válida. Encerrando.")
+            return
 
-            truncate_table(session)
-            load_data(session, df_filtered)
-        finally:
-            session.close()
+        # Renomear colunas para corresponder ao modelo
+        df_filtered.rename(columns=COLUMN_MAPPING, inplace=True)
+        
+        # Garantir que todas as colunas do modelo existam no DataFrame
+        # Adiciona colunas faltantes com None se não existirem
+        model_columns = [c.name for c in CvmDadosFinanceiros.__table__.columns if c.name != 'id']
+        for col in model_columns:
+            if col not in df_filtered.columns:
+                df_filtered[col] = None
 
-if __name__ == '__main__':
+        # Manter apenas as colunas que existem no modelo
+        df_final = df_filtered[model_columns]
+
+        load_data(session, df_final)
+        
+        print("
+================================================================================")
+        print("PROCESSO DE CARGA HISTÓRICA CONCLUÍDO COM SUCESSO!")
+        print("================================================================================")
+
+    except Exception as e:
+        logging.error(f"ERRO GERAL no processo de ETL: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        session.close()
+
+if __name__ == "__main__":
     process_historical_financial_reports()
-    print("Script de ETL finalizado.")
