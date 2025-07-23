@@ -2,6 +2,8 @@
 import os
 import pandas as pd
 from sqlalchemy.orm import sessionmaker
+# CORREÇÃO: Importar a função 'text' para comandos SQL literais
+from sqlalchemy import text 
 from dotenv import load_dotenv
 import time
 import requests
@@ -24,18 +26,9 @@ load_dotenv()
 app = create_app()
 
 def download_and_extract_data(year):
-    """
-    Tenta baixar e extrair os dados DRE para um ano específico.
-    Retorna o DataFrame se bem-sucedido, ou None se o arquivo não for encontrado (404).
-    Lança uma exceção para outros erros de HTTP.
-    """
-    # CORREÇÃO: URL e nome do arquivo CSV são construídos dinamicamente
     base_url = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/DFP/DADOS/"
-    # O arquivo ZIP principal contém todos os relatórios DFP
     zip_filename = f"dfp_cia_aberta_{year}.zip"
-    # O arquivo que queremos de dentro do ZIP (Demonstrativo de Resultado Consolidado)
     csv_filename = f"dfp_cia_aberta_DRE_con_{year}.csv"
-    
     url = f"{base_url}{zip_filename}"
     
     print(f"Tentando baixar dados para o ano {year} de: {url}")
@@ -45,11 +38,9 @@ def download_and_extract_data(year):
     if response.status_code == 404:
         print(f"AVISO: Arquivo para o ano {year} não encontrado (404).")
         return None
-        
-    response.raise_for_status() # Lança uma exceção para outros erros (500, 403, etc.)
+    response.raise_for_status()
 
     print(f"Download para {year} concluído. Processando arquivo ZIP em memória...")
-    
     try:
         with zipfile.ZipFile(io.BytesIO(response.content)) as z:
             if csv_filename not in z.namelist():
@@ -67,11 +58,15 @@ def download_and_extract_data(year):
         return None
 
 def truncate_table(session):
+    """Apaga todos os dados da tabela para evitar duplicatas antes da nova carga."""
     print("Limpando a tabela 'cvm_dados_financeiros'...")
-    session.execute(f'TRUNCATE TABLE {FinancialStatement.__tablename__} RESTART IDENTITY CASCADE;')
+    # CORREÇÃO: Envelopa o comando SQL literal com a função text()
+    command = text(f'TRUNCATE TABLE {FinancialStatement.__tablename__} RESTART IDENTITY CASCADE;')
+    session.execute(command)
     session.commit()
 
 def load_data(session, df):
+    # (Esta função permanece inalterada)
     objects_to_load = []
     total_rows = len(df)
     print(f"Iniciando a preparação de {total_rows} registros para a carga...")
@@ -101,10 +96,7 @@ def load_data(session, df):
         print(f"Carga concluída com sucesso em {end_bulk_time - start_bulk_time:.2f}s.")
 
 def process_financial_reports():
-    """
-    Função principal e robusta para o ETL dos dados financeiros.
-    Tenta baixar os dados do ano corrente, e se não encontrar, tenta do ano anterior.
-    """
+    """Função principal e robusta para o ETL dos dados financeiros."""
     current_year = datetime.now().year
     years_to_try = [current_year, current_year - 1]
     df = None
