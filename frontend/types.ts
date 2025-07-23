@@ -53,13 +53,6 @@ export interface Chat {
   messages: ChatMessage[];
 }
 
-export interface Assistant {
-  id: 'code' | 'research';
-  name: string;
-  description: string;
-  systemInstruction: string;
-}
-
 // Market News Page Types
 export interface CompanyMention {
     ticker: string;

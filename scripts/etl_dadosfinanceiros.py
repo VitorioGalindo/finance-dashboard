@@ -1,3 +1,4 @@
+# scripts/etl_dadosfinanceiros.py
 
 import os
 import requests
@@ -25,30 +26,33 @@ BASE_URL_ITR = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/ITR/DADOS/"
 START_YEAR = 2010
 END_YEAR = 2025 # Ano atual + 1 para garantir que pegamos os dados mais recentes
 
-# Mapeamento de colunas para o modelo SQLAlchemy
+# =====================================================================================
+# CORREÇÃO PRINCIPAL: Mapeamento de colunas ajustado para corresponder
+# exatamente aos nomes dos atributos da classe FinancialStatement em models.py
+# =====================================================================================
 COLUMN_MAPPING = {
-    'CNPJ_CIA': 'cnpj_cia',
-    'DENOM_CIA': 'denom_cia',
-    'CD_CVM': 'cd_cvm',
-    'VERSAO': 'versao',
-    'DT_REFER': 'dt_refer',
-    'DT_INI_EXERC': 'dt_ini_exerc',
-    'DT_FIM_EXERC': 'dt_fim_exerc',
-    'CD_CONTA': 'cd_conta',
-    'DS_CONTA': 'ds_conta',
-    'VL_CONTA': 'vl_conta',
-    'ESCALA_MOEDA': 'escala_moeda',
-    'MOEDA': 'moeda',
-    'ORDEM_EXERC': 'ordem_exerc',
-    'TIPO_DEMONSTRACAO': 'tipo_demonstracao',
-    'PERIODO': 'periodo'
+    'CNPJ_CIA': 'company_cnpj',
+    'DENOM_CIA': 'company_name',
+    'CD_CVM': 'cvm_code',
+    'VERSAO': 'report_version',
+    'DT_REFER': 'reference_date',
+    'DT_INI_EXERC': 'fiscal_year_start',
+    'DT_FIM_EXERC': 'fiscal_year_end',
+    'CD_CONTA': 'account_code',
+    'DS_CONTA': 'account_description',
+    'VL_CONTA': 'account_value',
+    'ESCALA_MOEDA': 'currency_scale',
+    'MOEDA': 'currency',
+    'ORDEM_EXERC': 'fiscal_year_order',
+    'TIPO_DEMONSTRACAO': 'report_type',
+    'PERIODO': 'period'
 }
 
 def download_and_process_file(url, file_type, year):
     """Baixa um arquivo, descompacta e processa em um DataFrame."""
     try:
         logging.info(f"--> Tentando baixar {file_type} para o ano {year}...")
-        response = requests.get(url, stream=True) # Usar stream para arquivos grandes
+        response = requests.get(url, stream=True)
         response.raise_for_status()
 
         logging.info("    + Download concluído. Processando...")
@@ -63,7 +67,6 @@ def download_and_process_file(url, file_type, year):
         for file_name in csv_files:
             with zip_file.open(file_name) as f:
                 try:
-                    # Otimização: Especificar dtypes conhecidos pode acelerar a leitura
                     df = pd.read_csv(f, sep=';', encoding='latin1', dtype={'CD_CVM': str, 'CNPJ_CIA': str})
                     all_dfs.append(df)
                 except UnicodeDecodeError:
@@ -85,7 +88,7 @@ def download_and_process_file(url, file_type, year):
         logging.error(f"    - ERRO: Falha ao processar o arquivo para o ano {year}. Detalhes: {e}")
     return None
 
-def load_data(session, df, batch_size=50000): # <-- VALOR DO LOTE AUMENTADO AQUI
+def load_data(session, df, batch_size=50000):
     """
     Carrega os dados do DataFrame para o banco de dados em lotes (batches).
     """
@@ -96,21 +99,31 @@ def load_data(session, df, batch_size=50000): # <-- VALOR DO LOTE AUMENTADO AQUI
     total_rows = len(df)
     logging.info(f"Iniciando a preparação e carga de {total_rows} registros em lotes de {batch_size}...")
     
-    # Otimização: Fazer conversões de data uma única vez
-    df['dt_refer'] = pd.to_datetime(df['dt_refer'], errors='coerce')
-    df['dt_ini_exerc'] = pd.to_datetime(df['dt_ini_exerc'], errors='coerce')
-    df['dt_fim_exerc'] = pd.to_datetime(df['dt_fim_exerc'], errors='coerce')
-
-    df.dropna(subset=['dt_refer'], inplace=True)
+    # Otimização: Renomeia as colunas do DataFrame uma única vez antes do loop
+    df.rename(columns=COLUMN_MAPPING, inplace=True)
     
-    # Garantir que o total de linhas reflete o dataframe após o dropna
-    total_rows = len(df)
+    # Converte colunas de data
+    df['reference_date'] = pd.to_datetime(df['reference_date'], errors='coerce')
+    df['fiscal_year_start'] = pd.to_datetime(df['fiscal_year_start'], errors='coerce')
+    df['fiscal_year_end'] = pd.to_datetime(df['fiscal_year_end'], errors='coerce')
+
+    # Remove linhas onde a data de referência é essencial e nula
+    df.dropna(subset=['reference_date'], inplace=True)
+    
+    total_rows = len(df) # Recalcula o total após remover NAs
+
+    # Obtém a lista de colunas válidas do modelo para garantir que não estamos inserindo colunas extras
+    model_columns = {c.name for c in FinancialStatement.__table__.columns}
 
     for start in tqdm(range(0, total_rows, batch_size), desc="Carregando dados para o BD"):
         end = min(start + batch_size, total_rows)
         batch_df = df.iloc[start:end]
         
-        data_to_insert = batch_df.to_dict(orient='records')
+        # Filtra o dicionário para conter apenas chaves que existem no modelo
+        data_to_insert = [
+            {key: value for key, value in row.items() if key in model_columns}
+            for row in batch_df.to_dict(orient='records')
+        ]
         
         try:
             session.bulk_insert_mappings(FinancialStatement, data_to_insert)
@@ -118,7 +131,7 @@ def load_data(session, df, batch_size=50000): # <-- VALOR DO LOTE AUMENTADO AQUI
         except Exception as e:
             logging.error(f"ERRO ao inserir o lote {start+1}-{end}: {e}")
             session.rollback()
-            
+
 def process_historical_financial_reports():
     """Orquestra o processo de ETL para os relatórios financeiros."""
     logging.info("Iniciando o script de ETL para dados financeiros...")
@@ -170,7 +183,7 @@ def process_historical_financial_reports():
         df_consolidated['CNPJ_CIA'] = df_consolidated['CNPJ_CIA'].str.replace(r'[./-]', '', regex=True).str.zfill(14)
         
         initial_count = len(df_consolidated)
-        logging.info("Limpando e validando CNPJs do DataFrame consolidado...")
+        logging.info("Filtrando registros para CNPJs válidos...")
         df_filtered = df_consolidated[df_consolidated['CNPJ_CIA'].isin(valid_cnpjs)].copy()
         
         discarded_count = initial_count - len(df_filtered)
@@ -180,20 +193,12 @@ def process_historical_financial_reports():
         if df_filtered.empty:
             logging.warning("Nenhum registro corresponde a uma empresa válida. Encerrando.")
             return
-
-        df_filtered.rename(columns=COLUMN_MAPPING, inplace=True)
         
-        model_columns = [c.name for c in FinancialStatement.__table__.columns if c.name != 'id']
-        for col in model_columns:
-            if col not in df_filtered.columns:
-                df_filtered[col] = None
-
-        df_final = df_filtered[model_columns].copy()
-
-        # Chamada da função load_data com o novo batch_size
-        load_data(session, df_final, batch_size=50000)
+        # A lógica de renomear e filtrar colunas foi movida para dentro da função load_data
+        # para maior eficiência, evitando manipulações desnecessárias no DataFrame completo.
+        load_data(session, df_filtered, batch_size=50000)
                 
-        print("" + "="*80)
+        print("\n" + "="*80)
         print("PROCESSO DE CARGA HISTÓRICA CONCLUÍDO COM SUCESSO!")
         print("="*80)
 

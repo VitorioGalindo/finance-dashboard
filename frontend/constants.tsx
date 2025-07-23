@@ -1,5 +1,5 @@
 import React from 'react';
-import { Page, Assistant, SectorNode, StockGuideData } from './types';
+import { Page, SectorNode, StockGuideData } from './types';
 
 export const navigationItems: { id: Page; name: string; icon: React.ReactNode }[] = [
   { id: 'portfolio', name: 'Carteira em Tempo Real', icon: <ChartPieIcon /> },
@@ -19,21 +19,6 @@ export const navigationItems: { id: Page; name: string; icon: React.ReactNode }[
   { id: 'screening', name: 'Screening', icon: <FunnelIcon /> },
   { id: 'fundamentalist', name: 'Fundamentalista', icon: <BookOpenIcon /> },
   { id: 'flow-data', name: 'Dados de Fluxo', icon: <ArrowsRightLeftIcon /> },
-];
-
-export const AI_ASSISTANTS: Assistant[] = [
-  {
-    id: 'code',
-    name: 'Assistente de Código',
-    description: 'Análise, refatoração e desenvolvimento de código.',
-    systemInstruction: `Você é um assistente de programação especialista. Seu nome é 'Apex Coder'. Sua especialidade é Python para finanças, mas você é proficiente em muitas outras linguagens como JavaScript, TypeScript, e SQL. Forneça explicações claras, blocos de código bem formatados com syntax highlighting, e siga as melhores práticas de engenharia de software. Ao analisar código, seja crítico e sugira melhorias de performance, legibilidade e segurança.`
-  },
-  {
-    id: 'research',
-    name: 'Assistente de Research',
-    description: 'Análise de empresas de capital aberto no Brasil.',
-    systemInstruction: `Você é um assistente de research financeiro especialista chamado 'Apex Analyst'. Sua função é fornecer análises claras, concisas e perspicazes sobre empresas de capital aberto no Brasil e no mundo. Responda em português do Brasil. Seus usuários são investidores e analistas, então use uma linguagem profissional, mas acessível. Ao fornecer dados numéricos, sempre que possível, indique a fonte e a data de referência. Seja objetivo e evite dar conselhos de investimento diretos. Em vez disso, apresente os fatos, prós e contras, para que o usuário possa tomar sua própria decisão informada. Estruture suas respostas com cabeçalhos, listas e tabelas para facilitar a leitura.`
-  }
 ];
 
 export const sectorTreeData: SectorNode[] = [
