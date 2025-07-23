@@ -119,8 +119,7 @@ def process_historical_financial_reports():
         print("FALHA NO ETL: Nenhum dado foi baixado. Abortando.")
         return
 
-    print("
-Concatenando todos os dataframes baixados...")
+    print("Concatenando todos os dataframes baixados...")
     final_df = pd.concat(all_dfs, ignore_index=True)
     print(f"Total de {len(final_df)} registros brutos encontrados.")
 
