@@ -116,8 +116,7 @@ def process_historical_financial_reports():
                 all_dfs.append(df)
 
     if not all_dfs:
-        print("
-FALHA NO ETL: Nenhum dado foi baixado. Abortando.")
+        print("FALHA NO ETL: Nenhum dado foi baixado. Abortando.")
         return
 
     print("
