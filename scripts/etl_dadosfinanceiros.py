@@ -6,7 +6,7 @@ import zipfile
 import io
 import pandas as pd
 import logging
-from sqlalchemy.orm import sessionmaker, inspect
+from sqlalchemy.orm import sessionmakersa
 from sqlalchemy import text
 from tqdm import tqdm
 import time
