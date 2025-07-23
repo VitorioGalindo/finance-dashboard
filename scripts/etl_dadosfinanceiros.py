@@ -23,7 +23,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 BASE_URL = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/DFP/DADOS/"
 BASE_URL_ITR = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/ITR/DADOS/"
-START_YEAR = 2023
+# Ajuste para um período menor para agilizar os testes
+START_YEAR = 2025 # Vamos usar um período menor para testes mais rápidos
 END_YEAR = 2025
 
 # Mapeamento CORRETO para os atributos da classe FinancialStatement
@@ -93,10 +94,8 @@ def load_data(session, df, batch_size=50000):
     session.execute(text("TRUNCATE TABLE cvm_dados_financeiros RESTART IDENTITY;"))
     session.commit()
 
-    # Renomeia as colunas do DataFrame para corresponderem aos atributos do modelo
     df.rename(columns=COLUMN_MAPPING, inplace=True)
     
-    # Converte colunas de data
     date_columns = ['reference_date', 'fiscal_year_start', 'fiscal_year_end']
     for col in date_columns:
         if col in df.columns:
@@ -112,12 +111,13 @@ def load_data(session, df, batch_size=50000):
         batch_df = df.iloc[start:end]
         
         # ============================================================================
-        # CORREÇÃO: A lógica de filtro defeituosa foi removida.
-        # Agora, simplesmente convertemos o DataFrame para dicionários.
-        # O SQLAlchemy se encarregará de usar as chaves que correspondem aos
-        # atributos do modelo e ignorar as que não correspondem.
+        # CORREÇÃO DEFINITIVA: Limpeza de dados nulos.
+        # Esta linha converte todos os valores nulos do Pandas (NaT para datas,
+        # NaN para números) para o valor None do Python. O `None` é corretamente
+        # interpretado como `NULL` pelo banco de dados.
         # ============================================================================
-        data_to_insert = batch_df.to_dict(orient='records')
+        cleaned_batch_df = batch_df.astype(object).where(pd.notnull(batch_df), None)
+        data_to_insert = cleaned_batch_df.to_dict(orient='records')
         
         if not data_to_insert:
             continue
@@ -128,6 +128,8 @@ def load_data(session, df, batch_size=50000):
         except Exception as e:
             logging.error(f"ERRO ao inserir o lote {start+1}-{end}: {e}")
             session.rollback()
+            # Opcional: descomente a linha abaixo para parar o script no primeiro erro de lote
+            # raise
 
 def process_historical_financial_reports():
     """Orquestra o processo de ETL para os relatórios financeiros."""
