@@ -24,7 +24,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 BASE_URL = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/DFP/DADOS/"
 BASE_URL_ITR = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/ITR/DADOS/"
 # Ajuste para um período menor para agilizar os testes
-START_YEAR = 2024 # Vamos usar um período menor para testes mais rápidos
+START_YEAR = 2011 # Vamos usar um período menor para testes mais rápidos
 END_YEAR = 2025
 
 # Mapeamento CORRETO para os atributos da classe FinancialStatement
