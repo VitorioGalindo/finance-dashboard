@@ -1,10 +1,11 @@
 # backend/models.py
-from .. import db # <-- Importa a instância db de __init__.py no nível acima
+from backend import db # <-- Importa a instância db do pacote backend
 
 # Remova ou comente a linha db = SQLAlchemy() se você a adicionou temporariamente
 # db = SQLAlchemy() # <-- REMOVER ou COMENTAR esta linha se você a adicionou temporariamente
 
 # ... definições dos modelos ...
+
 
 
 # Vamos usar a instância db de app, mas a importação precisa ser feita

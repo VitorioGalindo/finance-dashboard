@@ -1,12 +1,13 @@
 # backend/routes/companies_routes.py
 from flask import Blueprint, jsonify
-from ..models import Company # Importa o modelo Company
-from .. import db # <-- Importa a instância db de __init__.py no nível acima
+from backend.models import Company # Importa o modelo Company usando importação absoluta
+from backend import db # <-- Importa a instância db do pacote backend
 
 # Cria um Blueprint para agrupar as rotas de empresas
 companies_bp = Blueprint('companies', __name__)
 
 # ... resto do código ...
+
 
 @companies_bp.route('/companies', methods=['GET'])
 def get_companies():
