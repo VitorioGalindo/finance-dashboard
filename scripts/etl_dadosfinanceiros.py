@@ -1,108 +1,122 @@
+# scripts/etl_dadosfinanceiros.py
 import os
 import pandas as pd
-from sqlalchemy import create_engine, text
-import requests
-import zipfile
-import io
-from datetime import datetime
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
+import time
 
-def get_db_engine_vm():
-    """Lê as credenciais do .env e cria uma engine de conexão para o RDS."""
-    load_dotenv()
-    user = os.getenv("DB_USER")
-    password = os.getenv("DB_PASSWORD")
-    host = os.getenv("DB_HOST")
-    dbname = os.getenv("DB_NAME", "postgres")
-    if not all([user, password, host]):
-        raise ValueError("Credenciais do banco não encontradas no .env")
-    conn_str = f"postgresql+psycopg2://{user}:{password}@{host}/{dbname}?sslmode=require"
-    return create_engine(conn_str)
+# Importa os modelos do nosso backend.
+# Adicionamos o diretório raiz ao path para que o script possa encontrar o módulo 'backend'.
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from backend.models import FinancialStatement
 
-def fetch_and_process_cvm_data(url_template, anos, periodo, tipo_relatorio):
-    """Função genérica para buscar e processar dados DFP ou ITR."""
-    for ano in anos:
-        print(f"\nBuscando dados {periodo} para o ano: {ano}...")
+# --- CONFIGURAÇÃO E CONEXÃO COM O BANCO DE DADOS ---
+print("Iniciando o script de ETL para dados financeiros...")
+load_dotenv()
+
+DB_USER = os.getenv('DB_USER')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
+DB_HOST = os.getenv('DB_HOST')
+DB_NAME = os.getenv('DB_NAME')
+
+if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_NAME]):
+    print("ERRO: As variáveis de ambiente do banco de dados não estão configuradas.")
+    print("Verifique o seu arquivo .env.")
+    exit()
+
+# String de conexão com o banco de dados
+DATABASE_URI = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}?sslmode=require"
+engine = create_engine(DATABASE_URI)
+Session = sessionmaker(bind=engine)
+
+def truncate_table(session):
+    """Apaga todos os dados da tabela para evitar duplicatas antes da nova carga."""
+    print("Limpando a tabela 'cvm_dados_financeiros' (TRUNCATE)...")
+    session.execute(f'TRUNCATE TABLE {FinancialStatement.__tablename__} RESTART IDENTITY CASCADE;')
+    session.commit()
+    print("Tabela limpa com sucesso.")
+
+def load_data(session, df):
+    """Carrega os dados do DataFrame para o banco de dados usando o modelo FinancialStatement."""
+    objects_to_load = []
+    total_rows = len(df)
+    print(f"Iniciando a preparação de {total_rows} registros para a carga...")
+
+    start_time = time.time()
+    for index, row in df.iterrows():
+        # Cria um objeto do modelo para cada linha do DataFrame
+        statement = FinancialStatement(
+            company_cnpj=row.get('CNPJ_CIA'),
+            company_name=row.get('DENOM_CIA'),
+            cvm_code=row.get('CD_CVM'),
+            report_version=int(row.get('VERSAO')) if pd.notna(row.get('VERSAO')) else None,
+            reference_date=pd.to_datetime(row.get('DT_REFER')).date() if pd.notna(row.get('DT_REFER')) else None,
+            fiscal_year_start=pd.to_datetime(row.get('DT_INI_EXERC')).date() if pd.notna(row.get('DT_INI_EXERC')) else None,
+            fiscal_year_end=pd.to_datetime(row.get('DT_FIM_EXERC')).date() if pd.notna(row.get('DT_FIM_EXERC')) else None,
+            account_code=row.get('CD_CONTA'),
+            account_description=row.get('DS_CONTA'),
+            account_value=float(row.get('VL_CONTA')) if pd.notna(row.get('VL_CONTA')) else None,
+            currency_scale=row.get('ESCALA_MOEDA'),
+            currency=row.get('MOEDA'),
+            fiscal_year_order=row.get('ORDEM_EXERC'),
+            report_type=row.get('GRUPO_DFP'),
+            period=row.get('MOEDA') # Ajuste se houver uma coluna específica para o período
+        )
+        objects_to_load.append(statement)
+
+        # Log de progresso
+        if (index + 1) % 1000 == 0:
+            print(f"Preparou {index + 1}/{total_rows} registros...")
+
+    end_time = time.time()
+    print(f"Preparação de objetos concluída em {end_time - start_time:.2f} segundos.")
+
+    if objects_to_load:
+        print(f"Iniciando a carga de {len(objects_to_load)} registros no banco de dados. Isso pode levar alguns minutos...")
+        start_bulk_time = time.time()
+        
+        # O método bulk_save_objects é altamente eficiente para cargas em massa.
+        session.bulk_save_objects(objects_to_load)
+        session.commit()
+        
+        end_bulk_time = time.time()
+        print(f"Carga em lote concluída com sucesso em {end_bulk_time - start_bulk_time:.2f} segundos.")
+    else:
+        print("Nenhum objeto para carregar.")
+
+
+def process_financial_reports():
+    """Função principal para o ETL dos dados financeiros."""
+    # Define os caminhos para os arquivos de dados
+    path = './'
+    files = {
+        'dre': os.path.join(path, 'DFs Consolidados - DRE/DRE_con_2024.csv'),
+        # Adicione outros arquivos aqui se necessário (BPA, BPP, etc.)
+    }
+
+    try:
+        # Lê o arquivo CSV com o encoding correto e tratando erros de linhas
+        df_dre = pd.read_csv(files['dre'], sep=';', encoding='latin-1', on_bad_lines='skip')
+        print(f"Arquivo DRE lido com sucesso. {len(df_dre)} linhas encontradas.")
+
+        session = Session()
         try:
-            url = url_template.format(ano=ano)
-            response = requests.get(url, timeout=180)
-            if response.status_code != 200:
-                print(f"  -> Arquivo para o ano {ano} não encontrado. Pulando.")
-                continue
+            truncate_table(session)
+            load_data(session, df_dre)
+        finally:
+            session.close() # Garante que a sessão seja sempre fechada
 
-            zip_buffer = io.BytesIO(response.content)
-            with zipfile.ZipFile(zip_buffer) as z:
-                # Retorna um gerador de DataFrames, um para cada arquivo CSV no ZIP
-                for report_prefix in ['DRE_con', 'BPA_con', 'BPP_con', 'DFC_MI_con']:
-                    file_name = f'{tipo_relatorio}_cia_aberta_{report_prefix}_{ano}.csv'
-                    if file_name in z.namelist():
-                        print(f"  -> Processando arquivo: {file_name}")
-                        with z.open(file_name) as f:
-                            df = pd.read_csv(f, sep=';', encoding='latin-1', dtype=str)
-                            df['tipo_demonstracao'] = report_prefix.split('_')[0]
-                            df['periodo'] = periodo.upper()
-                            yield df # Usa 'yield' para retornar um gerador, economizando memória
-        except Exception as e:
-            print(f"  -> ERRO ao processar o ano {ano}: {e}")
-            
-# Substitua a função antiga por esta no seu arquivo teste_etl_cvm.py
+    except FileNotFoundError:
+        print(f"ERRO: O arquivo {files['dre']} não foi encontrado.")
+        print("Verifique se o arquivo está no diretório correto.")
+    except Exception as e:
+        print(f"Ocorreu um erro inesperado durante o processo de ETL: {e}")
+        import traceback
+        traceback.print_exc()
 
-def transform_and_load(df_chunk, engine):
-    """Transforma um pedaço de DataFrame e o carrega no banco de dados."""
-    print(f"  Transformando e carregando um lote de {len(df_chunk)} linhas...")
-    
-    # --- CORREÇÃO APLICADA AQUI ---
-    # 1. Primeiro, convertemos TODOS os nomes de coluna para minúsculas.
-    df_chunk.columns = df_chunk.columns.str.lower()
-    
-    # 2. Agora, com os nomes já em minúsculas, podemos filtrar e criar a cópia.
-    df_transformed = df_chunk[df_chunk['ordem_exerc'] == 'ÚLTIMO'].copy()
-    
-    # 3. As transformações seguintes agora funcionam na cópia.
-    df_transformed.loc[:, 'vl_conta'] = pd.to_numeric(df_transformed['vl_conta'].str.replace(',', '.'), errors='coerce')
-    df_transformed.loc[:, 'dt_fim_exerc'] = pd.to_datetime(df_transformed['dt_fim_exerc'], errors='coerce')
 
-    colunas_tabela = [
-        'cnpj_cia', 'denom_cia', 'cd_cvm', 'versao', 'dt_refer', 'dt_ini_exerc', 
-        'dt_fim_exerc', 'cd_conta', 'ds_conta', 'vl_conta', 'escala_moeda', 
-        'moeda', 'ordem_exerc', 'tipo_demonstracao', 'periodo'
-    ]
-    # O rename não é mais necessário, pois já convertemos para minúsculas
-    df_transformed = df_transformed[[col for col in colunas_tabela if col in df_transformed.columns]]
-
-    df_transformed.to_sql(
-        'cvm_dados_financeiros', 
-        engine, 
-        if_exists='append', 
-        index=False,
-        chunksize=10000 
-    )
-    
-def run_etl_pipeline():
-    print("--- INICIANDO PIPELINE ETL DA CVM (OTIMIZADO PARA MEMÓRIA) ---")
-    engine = get_db_engine_vm()
-    
-    # Limpa a tabela uma única vez no início
-    print("Limpando a tabela de destino...")
-    with engine.connect() as conn:
-        conn.execute(text("TRUNCATE TABLE cvm_dados_financeiros;"))
-        conn.commit()
-    
-    anos = range(2010, datetime.now().year + 1)
-    
-    # Processa dados anuais (DFP)
-    dfp_url = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/DFP/DADOS/dfp_cia_aberta_{ano}.zip"
-    dfp_generator = fetch_and_process_cvm_data(dfp_url, anos, 'ANUAL', 'dfp')
-    for df_chunk in dfp_generator:
-        transform_and_load(df_chunk, engine)
-
-    # Processa dados trimestrais (ITR)
-    itr_url = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/ITR/DADOS/itr_cia_aberta_{ano}.zip"
-    itr_generator = fetch_and_process_cvm_data(itr_url, anos, 'TRIMESTRAL', 'itr')
-    for df_chunk in itr_generator:
-        transform_and_load(df_chunk, engine)
-
-    print("\n--- CARGA DE DADOS DA CVM CONCLUÍDA COM SUCESSO! ---")
-
-if __name__ == "__main__":
-    run_etl_pipeline()
+if __name__ == '__main__':
+    process_financial_reports()
+    print("Script de ETL finalizado.")
