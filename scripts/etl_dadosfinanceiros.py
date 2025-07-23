@@ -4,9 +4,10 @@ import pandas as pd
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import time
-import requests  # Para fazer o download do arquivo
-import zipfile # Para lidar com arquivos .zip
-import io      # Para tratar o arquivo em memória
+import requests
+import zipfile
+import io
+from datetime import datetime
 
 # Adiciona o diretório raiz ao path
 import sys
@@ -22,37 +23,43 @@ print("Iniciando o script de ETL para dados financeiros...")
 load_dotenv()
 app = create_app()
 
-def download_and_extract_data(url):
+def download_and_extract_data(year):
     """
-    Baixa um arquivo ZIP da URL, extrai o primeiro CSV encontrado em memória
-    e o retorna como um DataFrame do pandas.
+    Tenta baixar e extrair os dados DRE para um ano específico.
+    Retorna o DataFrame se bem-sucedido, ou None se o arquivo não for encontrado (404).
+    Lança uma exceção para outros erros de HTTP.
     """
-    print(f"Baixando dados de: {url}")
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}
+    # CORREÇÃO: URL e nome do arquivo CSV são construídos dinamicamente
+    base_url = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/DFP/DADOS/"
+    # O arquivo ZIP principal contém todos os relatórios DFP
+    zip_filename = f"dfp_cia_aberta_{year}.zip"
+    # O arquivo que queremos de dentro do ZIP (Demonstrativo de Resultado Consolidado)
+    csv_filename = f"dfp_cia_aberta_DRE_con_{year}.csv"
+    
+    url = f"{base_url}{zip_filename}"
+    
+    print(f"Tentando baixar dados para o ano {year} de: {url}")
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     response = requests.get(url, headers=headers, stream=True)
     
-    # Verifica se o download foi bem-sucedido
-    if response.status_code != 200:
-        print(f"ERRO CRÍTICO: Falha ao baixar os dados. Status code: {response.status_code}")
+    if response.status_code == 404:
+        print(f"AVISO: Arquivo para o ano {year} não encontrado (404).")
         return None
+        
+    response.raise_for_status() # Lança uma exceção para outros erros (500, 403, etc.)
 
-    print("Download concluído. Processando arquivo ZIP em memória...")
+    print(f"Download para {year} concluído. Processando arquivo ZIP em memória...")
     
     try:
-        # Abre o arquivo ZIP diretamente do conteúdo da resposta HTTP
         with zipfile.ZipFile(io.BytesIO(response.content)) as z:
-            # Encontra o primeiro arquivo .csv dentro do zip
-            csv_filename = next((name for name in z.namelist() if name.endswith('.csv')), None)
-            
-            if not csv_filename:
-                print("ERRO CRÍTICO: Nenhum arquivo .csv encontrado dentro do arquivo ZIP.")
+            if csv_filename not in z.namelist():
+                print(f"ERRO CRÍTICO: O arquivo CSV esperado '{csv_filename}' não foi encontrado dentro de '{zip_filename}'.")
                 return None
             
-            print(f"Arquivo CSV encontrado no ZIP: {csv_filename}")
-            # Abre o arquivo CSV de dentro do ZIP e o carrega no pandas
+            print(f"Extraindo '{csv_filename}' do ZIP...")
             with z.open(csv_filename) as csv_file:
                 df = pd.read_csv(csv_file, sep=';', encoding='latin-1', on_bad_lines='skip', low_memory=False)
-                print(f"Arquivo CSV lido com sucesso para o DataFrame. {len(df)} linhas encontradas.")
+                print(f"DataFrame para {year} criado com sucesso ({len(df)} linhas).")
                 return df
                 
     except zipfile.BadZipFile:
@@ -65,7 +72,6 @@ def truncate_table(session):
     session.commit()
 
 def load_data(session, df):
-    # (Esta função está correta e permanece a mesma)
     objects_to_load = []
     total_rows = len(df)
     print(f"Iniciando a preparação de {total_rows} registros para a carga...")
@@ -95,32 +101,37 @@ def load_data(session, df):
         print(f"Carga concluída com sucesso em {end_bulk_time - start_bulk_time:.2f}s.")
 
 def process_financial_reports():
-    """Função principal para o ETL dos dados financeiros."""
-    # URL para os dados DFP (Demonstrações Financeiras Padronizadas) da CVM
-    # Exemplo para o ano de 2023. Podemos tornar o ano dinâmico no futuro.
-    cvm_url = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/DFP/DADOS/dfp_cia_aberta_DRE_con_2023.zip"
-    
-    try:
-        df = download_and_extract_data(cvm_url)
-        if df is None:
-            print("Processo de ETL interrompido devido a falha no download ou extração.")
-            return
+    """
+    Função principal e robusta para o ETL dos dados financeiros.
+    Tenta baixar os dados do ano corrente, e se não encontrar, tenta do ano anterior.
+    """
+    current_year = datetime.now().year
+    years_to_try = [current_year, current_year - 1]
+    df = None
 
-        with app.app_context():
-            db_engine = db.engine
-            Session = sessionmaker(bind=db_engine)
-            session = Session()
+    for year in years_to_try:
+        try:
+            df = download_and_extract_data(year)
+            if df is not None:
+                print(f"Dados para o ano {year} foram baixados e processados com sucesso.")
+                break
+        except requests.exceptions.RequestException as e:
+            print(f"ERRO DE REDE ao tentar baixar dados para o ano {year}: {e}")
+            df = None; break
 
-            try:
-                truncate_table(session)
-                load_data(session, df)
-            finally:
-                session.close()
+    if df is None:
+        print("FALHA NO ETL: Não foi possível baixar os dados financeiros dos últimos anos. Abortando.")
+        return
 
-    except Exception as e:
-        print(f"Ocorreu um erro inesperado e fatal durante o processo de ETL: {e}")
-        import traceback
-        traceback.print_exc()
+    with app.app_context():
+        db_engine = db.engine
+        Session = sessionmaker(bind=db_engine)
+        session = Session()
+        try:
+            truncate_table(session)
+            load_data(session, df)
+        finally:
+            session.close()
 
 if __name__ == '__main__':
     process_financial_reports()
