@@ -6,28 +6,31 @@ import zipfile
 import io
 
 # Configurações do banco de dados (ajuste conforme o seu ambiente)
-DB_HOST = os.environ.get('DB_HOST')
-DB_NAME = os.environ.get('DB_NAME')
-DB_USER = os.environ.get('DB_USER')
-DB_PASSWORD = os.environ.get('DB_PASSWORD')
+# É uma boa prática carregar essas variáveis a partir de um arquivo .env ou outra forma segura
+DB_HOST = os.environ.get('DB_HOST', 'localhost')
+DB_NAME = os.environ.get('DB_NAME', 'your_db')
+DB_USER = os.environ.get('DB_USER', 'your_user')
+DB_PASSWORD = os.environ.get('DB_PASSWORD', 'your_password')
 
 # URL do arquivo ZIP da CVM
-cvm_zip_url = 'https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_2025.zip'
-csv_file_name = 'fca_cia_aberta_valor_mobiliario_2025.csv'
+# O ano é dinâmico, você pode querer ajustá-lo no futuro
+CVM_YEAR = 2025 
+cvm_zip_url = f'https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{CVM_YEAR}.zip'
+csv_file_name = f'fca_cia_aberta_valor_mobiliario_{CVM_YEAR}.csv'
 
 def download_and_extract_csv(url, csv_name):
-    """Baixa o arquivo ZIP e extrai o CSV."""
+    """Baixa o arquivo ZIP, extrai o CSV necessário e retorna o caminho."""
     print(f"Baixando arquivo ZIP da CVM: {url}")
     try:
-        response = requests.get(url, stream=True)
-        response.raise_for_status() # Levanta exceção para status codes ruins
+        response = requests.get(url, stream=True, timeout=30)
+        response.raise_for_status()
 
         with zipfile.ZipFile(io.BytesIO(response.content)) as z:
             if csv_name in z.namelist():
                 print(f"Extraindo {csv_name}")
-                # Extract to a specific path if needed, e.g., os.path.join(os.getcwd(), csv_name)
-                z.extract(csv_name)
-                return csv_name
+                # Extrai para o diretório atual
+                extracted_path = z.extract(csv_name)
+                return extracted_path
             else:
                 print(f"Erro: Arquivo {csv_name} não encontrado dentro do ZIP.")
                 return None
@@ -44,101 +47,89 @@ def download_and_extract_csv(url, csv_name):
 
 def load_companies_and_tickers(csv_file_path):
     """Carrega dados do CSV para as tabelas companies e tickers."""
-    conn = None
-    cur = None
+    conn_params = {
+        'host': DB_HOST,
+        'database': DB_NAME,
+        'user': DB_USER,
+        'password': DB_PASSWORD,
+        'client_encoding': 'utf8' # Solução para o problema de encoding
+    }
+    
     try:
-        # Conectar ao banco de dados
-        conn = psycopg2.connect(
-           host=DB_HOST, 
-           database=DB_NAME, 
-           user=DB_USER, 
-           password=DB_PASSWORD,
-           client_encoding='utf8'  # <--- Adicione esta linha
-        )
-        cur = conn.cursor()
+        # Usar 'with' garante que a conexão e o cursor sejam fechados
+        with psycopg2.connect(**conn_params) as conn:
+            with conn.cursor() as cur:
+                # Verificar a codificação do servidor (opcional, mas bom para depurar)
+                cur.execute('SHOW SERVER_ENCODING;')
+                server_encoding = cur.fetchone()[0]
+                print(f"Conectado ao banco de dados. Codificação do servidor: {server_encoding}")
+                
+                # É uma boa prática garantir que o banco foi criado com UTF8
+                if server_encoding.upper() != 'UTF8' and server_encoding.upper() != 'UTF-8':
+                    print("Aviso: A codificação do servidor não é UTF8. Isso pode causar problemas.")
 
-        # Ler o arquivo CSV
-        try:
-            df = pd.read_csv(csv_file_path, sep=';', encoding='latin-1', dtype=str)
-            print("CSV read with latin-1 encoding and dtype=str.")
+                try:
+                    df = pd.read_csv(csv_file_path, sep=';', encoding='latin-1', dtype=str)
+                    print(f"Arquivo CSV '{csv_file_path}' lido com sucesso usando codificação 'latin-1'.")
+                except FileNotFoundError:
+                    print(f"Erro: Arquivo CSV não encontrado em {csv_file_path}")
+                    return
+                except Exception as e:
+                    print(f"Erro ao ler arquivo CSV: {e}")
+                    return
 
-        except FileNotFoundError:
-            print(f"Erro: Arquivo CSV não encontrado em {csv_file_path}")
-            return
-        except Exception as e:
-            print(f"Erro ao ler arquivo CSV: {e}")
-            return
+                print(f"Processando {len(df)} linhas do arquivo CSV...")
 
-        print(f"Lendo {len(df)} linhas do arquivo CSV.")
+                for index, row in df.iterrows():
+                    cnpj = ''.join(filter(str.isdigit, str(row.get('CNPJ_Companhia', ''))))
+                    nome_emp = row.get('Nome_Empresarial')
+                    codigo_neg = row.get('Codigo_Negociacao')
 
-        # Iterar sobre as linhas do CSV
-        for index, row in df.iterrows():
-            cnpj = str(row['CNPJ_Companhia']).replace('.', '').replace('/', '').replace('-', '') # Limpar CNPJ
-            nome_emp = row['Nome_Empresarial']
-            codigo_neg = row['Codigo_Negociacao']
-
-            if not cnpj:
-                # print(f"Skipping row {index}: CNPJ vazio.")
-                continue
-
-            # Inserir/Atualizar na tabela companies
-            try:
-                cur.execute(
-                    """
-                    INSERT INTO companies (cnpj, name, created_at, updated_at)
-                    VALUES (%s, %s, NOW(), NOW())
-                    ON CONFLICT (cnpj) DO NOTHING;
-                    """,
-                    (cnpj, nome_emp)
-                )
-                # Não commita aqui, para commitar tudo junto no final da linha
-            except Exception as e:
-                print(f"Erro ao inserir/atualizar empresa {cnpj}: {e}")
-                conn.rollback() # Rollback em caso de erro na empresa, mas continua tentando tickers
-                continue # Pula para a próxima linha do CSV se a empresa falhou
-
-            # Inserir na tabela tickers
-            if pd.notna(codigo_neg) and codigo_neg.strip(): # Garantir que Codigo_Negociacao não é nulo ou vazio
-                 try:
+                    if not cnpj or not nome_emp:
+                        continue
+                    
+                    # Inserir/Atualizar na tabela companies
                     cur.execute(
                         """
-                        INSERT INTO tickers (ticker, company_cnpj, is_active, created_at, updated_at)
-                        VALUES (%s, %s, TRUE, NOW(), NOW())
-                        ON CONFLICT (ticker) DO NOTHING; -- Evita duplicados de ticker
+                        INSERT INTO companies (cnpj, name, created_at, updated_at)
+                        VALUES (%s, %s, NOW(), NOW())
+                        ON CONFLICT (cnpj) DO NOTHING;
                         """,
-                        (codigo_neg.strip(), cnpj) # Usar strip() para remover espaços em branco
+                        (cnpj, nome_emp)
                     )
-                    conn.commit() # Commita a inserção do ticker
-                 except Exception as e:
-                    print(f"Erro ao inserir ticker {codigo_neg} para empresa {cnpj}: {e}")
-                    conn.rollback() # Rollback em caso de erro no ticker
-            else:
-                 # print(f"Skipping ticker insertion for company {cnpj}: Codigo_Negociacao is null or empty.")
-                 pass # Ignora linhas sem código de negociação
+                    
+                    # Inserir na tabela tickers
+                    if pd.notna(codigo_neg) and codigo_neg.strip():
+                        try:
+                            cur.execute(
+                                """
+                                INSERT INTO tickers (ticker, company_cnpj, is_active, created_at, updated_at)
+                                VALUES (%s, %s, TRUE, NOW(), NOW())
+                                ON CONFLICT (ticker) DO NOTHING;
+                                """,
+                                (codigo_neg.strip(), cnpj)
+                            )
+                        except Exception as e:
+                            # Logar o erro mas continuar o processo
+                            print(f"Erro ao inserir ticker {codigo_neg} para CNPJ {cnpj}: {e}")
+                            # Não é necessário fazer rollback aqui, pois o commit é no final
+                
+                # O commit é feito automaticamente ao sair do bloco 'with conn:'
+                print(f"Carga de dados de empresas e tickers concluída com sucesso.")
 
-
-        print(f"Carga inicial de dados de empresas e tickers concluída.")
-
-    except psycopg2.OperationalError as e:
-        print(f"Erro de conexão ao banco de dados: {e}")
+    except psycopg2.Error as e:
+        print(f"Erro de banco de dados: {e}")
     except Exception as e:
-        print(f"Ocorreu um erro: {e}")
+        print(f"Ocorreu um erro inesperado: {e}")
 
-    finally:
-        # Fechar conexão
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
 
-# Executar o processo
-if __name__ == "__main__": # Adicionado para permitir importação sem execução imediata
+if __name__ == "__main__":
     downloaded_csv_path = download_and_extract_csv(cvm_zip_url, csv_file_name)
     if downloaded_csv_path:
         load_companies_and_tickers(downloaded_csv_path)
-        # Opcional: Remover o arquivo CSV após a carga
-        # try:
-        #     os.remove(downloaded_csv_path)
-        #     print(f\"Arquivo temporário {downloaded_csv_path} removido.\")
-        # except OSError as e:
-        #     print(f\"Erro ao remover arquivo temporário {downloaded_csv_path}: {e}\")
+        try:
+            # Limpa o arquivo extraído após o uso
+            os.remove(downloaded_csv_path)
+            print(f"Arquivo temporário {downloaded_csv_path} removido.")
+        except OSError as e:
+            print(f"Erro ao remover arquivo temporário {downloaded_csv_path}: {e}")
