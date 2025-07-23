@@ -2,4 +2,5 @@ Flask
 psycopg2-binary
 pandas
 requests
-
+python-dotenv
+sqlalchemy
