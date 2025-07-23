@@ -1,12 +1,11 @@
 import os
 import pandas as pd
-# from sqlalchemy import create_engine, text # Não é mais necessário para este script, mas mantenha se for usar em outras partes
 import requests
 import zipfile
 import io
 from dotenv import load_dotenv
 from datetime import datetime
-import psycopg2 # Importar psycopg2 para a conexão direta
+import psycopg2
 
 def get_db_connection_string():
     """Lê as credenciais do .env e cria uma string de conexão para o RDS."""
@@ -16,21 +15,19 @@ def get_db_connection_string():
     host = os.getenv("DB_HOST")
     dbname = os.getenv("DB_NAME", "postgres")
     if not all([user, password, host, dbname]):
-        raise ValueError("Credenciais do banco de dados (DB_USER, DB_PASSWORD, DB_HOST, DB_NAME) não encontradas nas variáveis de ambiente ou arquivo .env")
+        raise ValueError("Credenciais do banco (DB_USER, DB_PASSWORD, DB_HOST, DB_NAME) não encontradas.")
     
-    # Retorna a string de conexão base
+    # Retorna a string de conexão base, sem forçar codificação.
     return f"postgresql://{user}:{password}@{host}/{dbname}?sslmode=require"
 
 def run_company_list_pipeline():
     """
-    Baixa os dados cadastrais (FCA) da CVM, filtra as empresas listadas
-    com ações na bolsa e salva uma lista mestra nas tabelas companies e tickers.
+    Baixa, filtra e carrega os dados da CVM para as tabelas companies e tickers,
+    lidando corretamente com a codificação.
     """
     print("--- INICIANDO PIPELINE DE CARGA DE EMPRESAS E TICKERS ---")
     
-    # Obtém a string de conexão base
     base_connection_str = get_db_connection_string()
-    
     conn = None
     cur = None
 
@@ -49,12 +46,11 @@ def run_company_list_pipeline():
                 raise FileNotFoundError(f"Arquivo '{arquivo_csv}' não encontrado no ZIP.")
 
             with z.open(arquivo_csv) as f:
-                # Lendo CSV com encoding='latin-1' e dtype=str, que já sabemos que funciona
+                # PASSO 1: Ler o CSV como latin-1 para obter strings Python corretas.
                 df = pd.read_csv(f, sep=';', encoding='latin-1', dtype=str)
 
         print("Dados extraídos com sucesso. Aplicando filtros...")
 
-        # --- Aplicação dos seus filtros ---
         df_filtrado = df[
             (df['Codigo_Negociacao'].notna()) &
             (df['Codigo_Negociacao'] != 'N/A') &
@@ -64,49 +60,33 @@ def run_company_list_pipeline():
 
         print(f"Encontrados {len(df_filtrado)} valores mobiliários listados após filtro.")
 
-        # --- Carga para o banco de dados (tabelas companies e tickers) ---
         print("Carregando dados nas tabelas companies e tickers...")
         
-        # Conecta ao banco de dados, especificando client_encoding=latin1 na conexão psycopg2
-        # Isso informa ao PostgreSQL que os dados que estamos ENVIANDO são latin1
-        # para que ele possa convertê-los corretamente para UTF8 (seu DB default)
-        conn = psycopg2.connect(f"{base_connection_str}&client_encoding=latin1")
+        # PASSO 2: Conectar ao DB UTF-8 da maneira padrão.
+        # O psycopg2 irá, por padrão, lidar com a conversão das strings Python para UTF-8.
+        conn = psycopg2.connect(base_connection_str)
         cur = conn.cursor()
 
-        # Iterar sobre as linhas do DataFrame filtrado
         for index, row in df_filtrado.iterrows():
             cnpj = str(row['CNPJ_Companhia']).replace('.', '').replace('/', '').replace('-', '')
-            nome_emp_original = row['Nome_Empresarial']
+            # A string nome_emp já está correta após a leitura do CSV com latin-1
+            nome_emp = row['Nome_Empresarial'] 
             codigo_neg = row['Codigo_Negociacao'].strip()
 
-            if not cnpj or not codigo_neg:
+            if not cnpj or not codigo_neg or not nome_emp:
                 continue
-
-            # Tentar converter o nome da empresa para UTF-8, lidando com caracteres problemáticos
-            nome_emp_cleaned = nome_emp_original
-            if nome_emp_original:
-                try:
-                    # Codifica para latin1, ignorando caracteres que não se encaixam (para evitar 'ordinal not in range')
-                    latin1_bytes = nome_emp_original.encode('latin1', errors='ignore') 
-                    # Decodifica esses bytes para UTF-8, substituindo caracteres inválidos
-                    nome_emp_cleaned = latin1_bytes.decode('utf-8', errors='replace')
-                except Exception as e:
-                    # Este bloco catch é uma salvaguarda. A lógica acima deve ser robusta.
-                    print(f"Erro complexo de codificação para '{nome_emp_original}': {e}. Usando original decodificado com replace.")
-                    nome_emp_cleaned = nome_emp_original.decode('utf-8', errors='replace') # Decodifica o original do pandas com 'replace'
-
+            
             try:
-                # Inserir/Atualizar na tabela companies
+                # PASSO 3: Inserir a string Python diretamente. Sem encode/decode aqui.
                 cur.execute(
                     """
                     INSERT INTO companies (cnpj, name, created_at, updated_at)
                     VALUES (%s, %s, NOW(), NOW())
                     ON CONFLICT (cnpj) DO NOTHING;
                     """,
-                    (cnpj, nome_emp_cleaned) # <-- Usar a versão limpa aqui
+                    (cnpj, nome_emp) # Usar a variável diretamente
                 )
 
-                # Inserir na tabela tickers
                 cur.execute(
                     """
                     INSERT INTO tickers (ticker, company_cnpj, is_active, created_at, updated_at)
@@ -116,31 +96,20 @@ def run_company_list_pipeline():
                     (codigo_neg, cnpj)
                 )
                 
-                # Commitar cada linha para ver o progresso, ou commitar em lotes para performance
                 conn.commit() 
 
             except Exception as e:
                 print(f"Erro ao processar CNPJ {cnpj} e Ticker {codigo_neg}: {e}")
-                conn.rollback() # Rollback da transação atual em caso de erro
+                conn.rollback()
 
         print("--- CARGA DE EMPRESAS E TICKERS CONCLUÍDA COM SUCESSO! ---")
 
-    except FileNotFoundError as e:
-         print(f"Erro de arquivo: {e}")
-    except requests.exceptions.RequestException as e:
-         print(f"Erro ao baixar dados: {e}")
-    except zipfile.BadZipFile:
-         print("Erro: Arquivo baixado não é um ZIP válido.")
     except Exception as e:
         print(f"Ocorreu um erro no pipeline: {e}")
 
     finally:
-        # Fechar cursor e conexão
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-
+        if cur: cur.close()
+        if conn: conn.close()
 
 if __name__ == "__main__":
     run_company_list_pipeline()
