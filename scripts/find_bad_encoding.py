@@ -56,11 +56,9 @@ def find_bad_encoding_company():
 ")
                 # Tenta mostrar os bytes brutos para análise
                 try:
-                    # Tenta encodar como latin1 para ver os bytes
-                    raw_bytes = name.encode('latin1')
-                    print(f"Bytes brutos do nome: {raw_bytes}")
-                except Exception as inner_e:
-                    print(f"Não foi possível obter os bytes brutos: {inner_e}")
+                    print(f"Bytes brutos do nome: {name.encode('latin1')}")
+                except:
+                    pass
                 break # Para no primeiro erro
 
     except Exception as e:
