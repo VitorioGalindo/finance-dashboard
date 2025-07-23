@@ -1,10 +1,12 @@
 # backend/routes/companies_routes.py
 from flask import Blueprint, jsonify
 from ..models import Company # Importa o modelo Company
-from ..app import db # Importa a instância do SQLAlchemy
+from .. import db # <-- Importa a instância db de __init__.py no nível acima
 
 # Cria um Blueprint para agrupar as rotas de empresas
 companies_bp = Blueprint('companies', __name__)
+
+# ... resto do código ...
 
 @companies_bp.route('/companies', methods=['GET'])
 def get_companies():
