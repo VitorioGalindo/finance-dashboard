@@ -39,7 +39,9 @@ COLUMN_MAPPING = {
     'VL_CONTA': 'vl_conta',
     'ESCALA_MOEDA': 'escala_moeda',
     'MOEDA': 'moeda',
-    'ORDEM_EXERC': 'ordem_exerc'
+    'ORDEM_EXERC': 'ordem_exerc',
+    'TIPO_DEMONSTRACAO': 'tipo_demonstracao',
+    'PERIODO': 'periodo'
 }
 
 def download_and_process_file(url, file_type, year):
@@ -52,22 +54,23 @@ def download_and_process_file(url, file_type, year):
         logging.info("    + Download concluído. Processando...")
         zip_file = zipfile.ZipFile(io.BytesIO(response.content))
         all_dfs = []
-        for file_name in zip_file.namelist():
-            if file_name.endswith('.csv'):
-                with zip_file.open(file_name) as f:
-                    try:
-                        # Tenta ler com encoding 'latin1' que é comum em dados brasileiros
-                        df = pd.read_csv(f, sep=';', encoding='latin1', dtype={'CD_CVM': str})
-                        all_dfs.append(df)
-                    except UnicodeDecodeError:
-                        logging.warning(f"    - AVISO: Falha ao ler {file_name} com latin1, tentando utf-8...")
-                        f.seek(0)
-                        df = pd.read_csv(f, sep=';', encoding='utf-8', dtype={'CD_CVM': str})
-                        all_dfs.append(df)
-
-        if not all_dfs:
+        
+        # Encontrar todos os arquivos CSV relevantes no zip (ex: BPA, DRE, etc.)
+        csv_files = [f for f in zip_file.namelist() if f.endswith('.csv')]
+        if not csv_files:
             logging.warning(f"    - AVISO: Nenhum arquivo CSV encontrado no zip para o ano {year}.")
             return None
+
+        for file_name in csv_files:
+            with zip_file.open(file_name) as f:
+                try:
+                    df = pd.read_csv(f, sep=';', encoding='latin1', dtype={'CD_CVM': str})
+                    all_dfs.append(df)
+                except UnicodeDecodeError:
+                    logging.warning(f"    - AVISO: Falha ao ler {file_name} com latin1, tentando utf-8...")
+                    f.seek(0)
+                    df = pd.read_csv(f, sep=';', encoding='utf-8', dtype={'CD_CVM': str})
+                    all_dfs.append(df)
 
         consolidated_df = pd.concat(all_dfs, ignore_index=True)
         logging.info(f"    + DataFrame criado com sucesso ({len(consolidated_df)} linhas).")
@@ -84,53 +87,42 @@ def download_and_process_file(url, file_type, year):
 
 def load_data(session, df, batch_size=10000):
     """
-    Carrega os dados do DataFrame para o banco de dados em lotes (batches),
-    com otimizações para performance.
+    Carrega os dados do DataFrame para o banco de dados em lotes (batches).
     """
     logging.info("Limpando a tabela 'cvm_dados_financeiros' para a carga completa...")
-    # Usamos TRUNCATE para resetar a tabela de forma eficiente e reiniciar a contagem de ID.
     session.execute(text("TRUNCATE TABLE cvm_dados_financeiros RESTART IDENTITY;"))
     session.commit()
 
     total_rows = len(df)
     logging.info(f"Iniciando a preparação e carga de {total_rows} registros em lotes de {batch_size}...")
     
-    start_time_total = time.time()
-    
-    # Prepara as colunas de data
     df['dt_refer'] = pd.to_datetime(df['dt_refer'], errors='coerce')
     df['dt_ini_exerc'] = pd.to_datetime(df['dt_ini_exerc'], errors='coerce')
     df['dt_fim_exerc'] = pd.to_datetime(df['dt_fim_exerc'], errors='coerce')
 
-    # Itera sobre o DataFrame em lotes
+    # Remove linhas onde datas essenciais são NaT (Not a Time) após a conversão
+    df.dropna(subset=['dt_refer'], inplace=True)
+
     for start in tqdm(range(0, total_rows, batch_size), desc="Carregando dados para o BD"):
         end = min(start + batch_size, total_rows)
         batch_df = df.iloc[start:end]
         
-        # Converte o lote para uma lista de dicionários
         data_to_insert = batch_df.to_dict(orient='records')
         
         try:
-            # Usa bulk_insert_mappings para eficiência
             session.bulk_insert_mappings(FinancialStatement, data_to_insert)
             session.commit()
         except Exception as e:
             logging.error(f"ERRO ao inserir o lote {start+1}-{end}: {e}")
             session.rollback()
-            # Opcional: parar o processo em caso de erro
-            # raise e
             
-    end_time_total = time.time()
-    logging.info(f"Carga em lote concluída em {end_time_total - start_time_total:.2f} segundos.")
-
-
 def process_historical_financial_reports():
     """Orquestra o processo de ETL para os relatórios financeiros."""
     logging.info("Iniciando o script de ETL para dados financeiros...")
-    print("================================================================================")
+    print("="*80)
     print(f"INICIANDO PROCESSO DE CARGA HISTÓRICA COMPLETA")
     print(f"Período: {START_YEAR} a {END_YEAR} | Documentos: ['DFP', 'ITR']")
-    print("================================================================================")
+    print("="*80)
     
     all_dataframes = []
     doc_types = [
@@ -140,15 +132,19 @@ def process_historical_financial_reports():
 
     for year in range(START_YEAR, END_YEAR + 1):
         for doc in doc_types:
-            file_url = f"{doc['url_base']}dfp_cia_aberta_{year}.zip" if doc['type'] == 'DFP' else f"{doc['url_base']}itr_cia_aberta_{year}.zip"
+            file_url = f"{doc['url_base']}{doc['type'].lower()}_cia_aberta_{year}.zip"
             
             df = download_and_process_file(file_url, doc['type'], year)
             if df is not None:
-                # Adiciona uma coluna para identificar o tipo de demonstrativo (DFP/ITR)
                 if 'GRUPO_DFP' in df.columns:
-                    df['TIPO_DEMONSTRACAO'] = df['GRUPO_DFP'].apply(lambda x: x.split(' - ')[1] if ' - ' in x else x)
+                    # CORREÇÃO: Verifica se o valor é uma string antes de tentar usar split().
+                    # Isso evita o erro 'TypeError' em valores NaN (float).
+                    df['TIPO_DEMONSTRACAO'] = df['GRUPO_DFP'].apply(
+                        lambda x: x.split(' - ')[1] if isinstance(x, str) and ' - ' in x else x
+                    )
                 else:
-                    df['TIPO_DEMONSTRACAO'] = 'N/A' # Coluna não presente, definir um padrão
+                    df['TIPO_DEMONSTRACAO'] = 'N/A'
+                    
                 df['PERIODO'] = 'ANUAL' if doc['type'] == 'DFP' else 'TRIMESTRAL'
                 all_dataframes.append(df)
 
@@ -191,13 +187,13 @@ def process_historical_financial_reports():
             if col not in df_filtered.columns:
                 df_filtered[col] = None
 
-        df_final = df_filtered[model_columns]
+        df_final = df_filtered[model_columns].copy()
 
         load_data(session, df_final)
                 
-        print("================================================================================")
+        print("" + "="*80)
         print("PROCESSO DE CARGA HISTÓRICA CONCLUÍDO COM SUCESSO!")
-        print("================================================================================")
+        print("="*80)
 
     except Exception as e:
         logging.error(f"ERRO GERAL no processo de ETL: {e}")
