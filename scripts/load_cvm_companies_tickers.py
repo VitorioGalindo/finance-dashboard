@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from sqlalchemy import create_engine, text
+# from sqlalchemy import create_engine, text # Não é mais necessário para este script, mas mantenha se for usar em outras partes
 import requests
 import zipfile
 import io
@@ -82,17 +82,19 @@ def run_company_list_pipeline():
             if not cnpj or not codigo_neg:
                 continue
 
-            # Tentar converter o nome da empresa para UTF-8, substituindo caracteres problemáticos
+            # Tentar converter o nome da empresa para UTF-8, lidando com caracteres problemáticos
             nome_emp_cleaned = nome_emp_original
             if nome_emp_original:
                 try:
-                    nome_emp_cleaned = nome_emp_original.encode('latin1').decode('utf-8', errors='replace')
+                    # Codifica para latin1, ignorando caracteres que não se encaixam (para evitar 'ordinal not in range')
+                    latin1_bytes = nome_emp_original.encode('latin1', errors='ignore') 
+                    # Decodifica esses bytes para UTF-8, substituindo caracteres inválidos
+                    nome_emp_cleaned = latin1_bytes.decode('utf-8', errors='replace')
                 except Exception as e:
-                    print(f"Erro ao forçar UTF-8 para '{nome_emp_original}': {e}. Usando original com cuidado.")
-                    # Fallback para o original se a conversão falhar, mas isso pode levar ao erro de DB
-                    # Idealmente, você investigaria esses casos específicos ou limparia ainda mais.
-                    nome_emp_cleaned = nome_emp_original
-            
+                    # Este bloco catch é uma salvaguarda. A lógica acima deve ser robusta.
+                    print(f"Erro complexo de codificação para '{nome_emp_original}': {e}. Usando original decodificado com replace.")
+                    nome_emp_cleaned = nome_emp_original.decode('utf-8', errors='replace') # Decodifica o original do pandas com 'replace'
+
             try:
                 # Inserir/Atualizar na tabela companies
                 cur.execute(
