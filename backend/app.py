@@ -12,10 +12,15 @@ def create_app(config_class=Config):
     db.init_app(app)
 
     # Registra o blueprint
-    app.register_blueprint(companies_bp, url_prefix='/api')
+    app.register_blueprint(companies_bp, url_prefix='/api') # <-- LINHA IMPORTANTE
 
     @app.route('/')
     def index():
         return "Backend do Dashboard Financeiro está funcionando!"
 
     return app
+
+# Se este arquivo for executado diretamente
+if __name__ == '__main__':
+    app = create_app()
+    app.run(debug=True)

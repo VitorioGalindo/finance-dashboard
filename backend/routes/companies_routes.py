@@ -1,11 +1,14 @@
 # backend/routes/companies_routes.py
 from flask import Blueprint, jsonify
 from backend.models import Company
+from backend import db
 
 companies_bp = Blueprint('companies_bp', __name__)
 
-@companies_bp.route('/companies', methods=['GET'])
+@companies_bp.route('/companies', methods=['GET']) # <-- ROTA IMPORTANTE
 def get_companies():
+    # ... resto do código ...
+
     """Retorna uma lista de todas as empresas."""
     try:
         companies = Company.query.all()
