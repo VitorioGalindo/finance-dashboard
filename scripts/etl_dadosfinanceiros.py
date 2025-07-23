@@ -6,7 +6,7 @@ import zipfile
 import io
 import pandas as pd
 import logging
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, inspect
 from sqlalchemy import text
 from tqdm import tqdm
 import time
@@ -24,12 +24,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 BASE_URL = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/DFP/DADOS/"
 BASE_URL_ITR = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/ITR/DADOS/"
 START_YEAR = 2010
-END_YEAR = 2025 # Ano atual + 1 para garantir que pegamos os dados mais recentes
+END_YEAR = 2025
 
-# =====================================================================================
-# CORREÇÃO PRINCIPAL: Mapeamento de colunas ajustado para corresponder
-# exatamente aos nomes dos atributos da classe FinancialStatement em models.py
-# =====================================================================================
+# Mapeamento CORRETO para os atributos da classe FinancialStatement
 COLUMN_MAPPING = {
     'CNPJ_CIA': 'company_cnpj',
     'DENOM_CIA': 'company_name',
@@ -96,35 +93,35 @@ def load_data(session, df, batch_size=50000):
     session.execute(text("TRUNCATE TABLE cvm_dados_financeiros RESTART IDENTITY;"))
     session.commit()
 
-    total_rows = len(df)
-    logging.info(f"Iniciando a preparação e carga de {total_rows} registros em lotes de {batch_size}...")
-    
-    # Otimização: Renomeia as colunas do DataFrame uma única vez antes do loop
+    # Renomeia as colunas do DataFrame para corresponderem aos atributos do modelo
     df.rename(columns=COLUMN_MAPPING, inplace=True)
     
     # Converte colunas de data
-    df['reference_date'] = pd.to_datetime(df['reference_date'], errors='coerce')
-    df['fiscal_year_start'] = pd.to_datetime(df['fiscal_year_start'], errors='coerce')
-    df['fiscal_year_end'] = pd.to_datetime(df['fiscal_year_end'], errors='coerce')
+    date_columns = ['reference_date', 'fiscal_year_start', 'fiscal_year_end']
+    for col in date_columns:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
 
-    # Remove linhas onde a data de referência é essencial e nula
     df.dropna(subset=['reference_date'], inplace=True)
     
-    total_rows = len(df) # Recalcula o total após remover NAs
-
-    # Obtém a lista de colunas válidas do modelo para garantir que não estamos inserindo colunas extras
-    model_columns = {c.name for c in FinancialStatement.__table__.columns}
+    total_rows = len(df)
+    logging.info(f"Iniciando a preparação e carga de {total_rows} registros em lotes de {batch_size}...")
 
     for start in tqdm(range(0, total_rows, batch_size), desc="Carregando dados para o BD"):
         end = min(start + batch_size, total_rows)
         batch_df = df.iloc[start:end]
         
-        # Filtra o dicionário para conter apenas chaves que existem no modelo
-        data_to_insert = [
-            {key: value for key, value in row.items() if key in model_columns}
-            for row in batch_df.to_dict(orient='records')
-        ]
+        # ============================================================================
+        # CORREÇÃO: A lógica de filtro defeituosa foi removida.
+        # Agora, simplesmente convertemos o DataFrame para dicionários.
+        # O SQLAlchemy se encarregará de usar as chaves que correspondem aos
+        # atributos do modelo e ignorar as que não correspondem.
+        # ============================================================================
+        data_to_insert = batch_df.to_dict(orient='records')
         
+        if not data_to_insert:
+            continue
+
         try:
             session.bulk_insert_mappings(FinancialStatement, data_to_insert)
             session.commit()
@@ -149,7 +146,6 @@ def process_historical_financial_reports():
     for year in range(START_YEAR, END_YEAR + 1):
         for doc in doc_types:
             file_url = f"{doc['url_base']}{doc['type'].lower()}_cia_aberta_{year}.zip"
-            
             df = download_and_process_file(file_url, doc['type'], year)
             if df is not None:
                 if 'GRUPO_DFP' in df.columns:
@@ -158,7 +154,6 @@ def process_historical_financial_reports():
                     )
                 else:
                     df['TIPO_DEMONSTRACAO'] = 'N/A'
-                    
                 df['PERIODO'] = 'ANUAL' if doc['type'] == 'DFP' else 'TRIMESTRAL'
                 all_dataframes.append(df)
 
@@ -182,11 +177,10 @@ def process_historical_financial_reports():
         
         df_consolidated['CNPJ_CIA'] = df_consolidated['CNPJ_CIA'].str.replace(r'[./-]', '', regex=True).str.zfill(14)
         
-        initial_count = len(df_consolidated)
         logging.info("Filtrando registros para CNPJs válidos...")
         df_filtered = df_consolidated[df_consolidated['CNPJ_CIA'].isin(valid_cnpjs)].copy()
         
-        discarded_count = initial_count - len(df_filtered)
+        discarded_count = len(df_consolidated) - len(df_filtered)
         if discarded_count > 0:
             logging.warning(f"{discarded_count} registros foram descartados por não corresponderem a uma empresa na tabela 'companies'.")
 
@@ -194,8 +188,6 @@ def process_historical_financial_reports():
             logging.warning("Nenhum registro corresponde a uma empresa válida. Encerrando.")
             return
         
-        # A lógica de renomear e filtrar colunas foi movida para dentro da função load_data
-        # para maior eficiência, evitando manipulações desnecessárias no DataFrame completo.
         load_data(session, df_filtered, batch_size=50000)
                 
         print("\n" + "="*80)
