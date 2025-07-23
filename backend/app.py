@@ -3,6 +3,9 @@ from flask import Flask
 from .config import Config
 from flask_sqlalchemy import SQLAlchemy
 
+# Importar e registrar blueprints (rotas) aqui depois
+from .routes.companies_routes import companies_bp # <-- Adicionar esta linha
+
 db = SQLAlchemy() # Inicializa a extensão SQLAlchemy
 
 def create_app():
@@ -11,9 +14,8 @@ def create_app():
 
     db.init_app(app) # Inicializa o SQLAlchemy com a aplicação Flask
 
-    # Importar e registrar blueprints (rotas) aqui depois
-    # from .routes.<feature> import <feature>_bp
-    # app.register_blueprint(<feature>_bp, url_prefix='/api')
+    # Registrar blueprints
+    app.register_blueprint(companies_bp, url_prefix='/api') # <-- Adicionar esta linha para registrar o blueprint
 
     @app.route('/')
     def index():
