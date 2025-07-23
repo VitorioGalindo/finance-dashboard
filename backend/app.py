@@ -1,20 +1,17 @@
 # backend/app.py
 from flask import Flask
-from .config import Config
-from . import db # <-- Importa a instância db de __init__.py
+from backend.config import Config
+from backend import db
+from backend.routes.companies_routes import companies_bp
 
-# Importar e registrar blueprints (rotas) aqui depois
-from .routes.companies_routes import companies_bp # <-- Adicionar esta linha
-
-# db = SQLAlchemy() # <-- REMOVER esta linha
-
-def create_app():
+def create_app(config_class=Config):
     app = Flask(__name__)
-    app.config.from_object(Config)
+    app.config.from_object(config_class)
 
-    db.init_app(app) # Inicializa o SQLAlchemy com a aplicação Flask
+    # Inicializa o db com a aplicação
+    db.init_app(app)
 
-    # Registrar blueprints
+    # Registra o blueprint
     app.register_blueprint(companies_bp, url_prefix='/api')
 
     @app.route('/')
@@ -22,10 +19,3 @@ def create_app():
         return "Backend do Dashboard Financeiro está funcionando!"
 
     return app
-
-# Se este arquivo for executado diretamente
-if __name__ == '__main__':
-    # Este bloco pode precisar ser ajustado para rodar com flask run
-    # Flask run é a forma recomendada, então este bloco pode ser menos crucial
-    app = create_app()
-    app.run(debug=True)
