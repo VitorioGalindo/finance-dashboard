@@ -8,7 +8,7 @@ import time
 import requests
 import zipfile
 import io
-import re # Módulo para expressões regulares (limpeza de CNPJ)
+import re
 from datetime import datetime
 
 import sys
@@ -23,45 +23,58 @@ load_dotenv()
 app = create_app()
 
 def clean_cnpj(cnpj):
-    """Remove toda a pontuação de um CNPJ, retornando apenas os dígitos."""
-    if not isinstance(cnpj, str):
-        return None
+    if not isinstance(cnpj, str): return None
     return re.sub(r'[^0-9]', '', cnpj)
 
-def download_and_extract_data(year):
-    # (Esta função está correta e permanece a mesma)
-    base_url = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/DFP/DADOS/"
-    zip_filename = f"dfp_cia_aberta_{year}.zip"
-    csv_filename = f"dfp_cia_aberta_DRE_con_{year}.csv"
+def download_and_extract_data(year, doc_type):
+    """
+    Tenta baixar e extrair os dados DRE para um ano e tipo de documento (DFP ou ITR) específico.
+    """
+    base_url = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/{doc_type.upper()}/DADOS/"
+    zip_filename = f"{doc_type.lower()}_cia_aberta_{year}.zip"
+    
+    # CORREÇÃO CRÍTICA: O nome do arquivo CSV agora é dinâmico, baseado no doc_type.
+    csv_filename = f"{doc_type.lower()}_cia_aberta_DRE_con_{year}.csv"
+    
     url = f"{base_url}{zip_filename}"
-    print(f"Tentando baixar dados para o ano {year} de: {url}")
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    response = requests.get(url, headers=headers, stream=True)
-    if response.status_code == 404:
-        print(f"AVISO: Arquivo para o ano {year} não encontrado (404).")
-        return None
-    response.raise_for_status()
-    print(f"Download para {year} concluído. Processando...")
-    with zipfile.ZipFile(io.BytesIO(response.content)) as z:
-        if csv_filename not in z.namelist():
-            print(f"ERRO: Arquivo CSV '{csv_filename}' não encontrado no ZIP.")
+
+    print(f"--> Tentando baixar {doc_type.upper()} para o ano {year}...")
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, stream=True)
+        if response.status_code == 404:
+            print(f"    - AVISO: Arquivo não encontrado (404). Pulando.")
             return None
-        with z.open(csv_filename) as csv_file:
-            df = pd.read_csv(csv_file, sep=';', encoding='latin-1', on_bad_lines='skip', low_memory=False)
-            print(f"DataFrame para {year} criado com sucesso ({len(df)} linhas).")
-            return df
+        response.raise_for_status()
+
+        print(f"    + Download concluído. Processando...")
+        with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+            if csv_filename not in z.namelist():
+                print(f"    - ERRO: Arquivo CSV esperado '{csv_filename}' não foi encontrado no ZIP. Pulando.")
+                return None
+            with z.open(csv_filename) as csv_file:
+                df = pd.read_csv(csv_file, sep=';', encoding='latin-1', on_bad_lines='skip', low_memory=False)
+                print(f"    + DataFrame criado com sucesso ({len(df)} linhas).")
+                return df
+    except requests.exceptions.RequestException as e:
+        print(f"    - ERRO DE REDE: {e}")
+    except zipfile.BadZipFile:
+        print(f"    - ERRO: O arquivo baixado não é um ZIP válido.")
+    except Exception as e:
+        print(f"    - ERRO inesperado: {e}")
+    return None
 
 def truncate_table(session):
-    print("Limpando a tabela 'cvm_dados_financeiros'...")
-    command = text(f'TRUNCATE TABLE {FinancialStatement.__tablename__} RESTART IDENTITY CASCADE;')
-    session.execute(command)
+    print("Limpando a tabela 'cvm_dados_financeiros' para a carga completa...")
+    session.execute(text(f'TRUNCATE TABLE {FinancialStatement.__tablename__} RESTART IDENTITY CASCADE;'))
     session.commit()
 
 def load_data(session, df):
-    # (Esta função permanece inalterada)
+    # (Esta função está correta e permanece a mesma)
     objects_to_load = []
     total_rows = len(df)
-    print(f"Iniciando a preparação de {total_rows} registros para a carga...")
+    print(f"
+Iniciando a preparação de {total_rows} registros para a carga...")
     start_time = time.time()
     for index, row in df.iterrows():
         statement = FinancialStatement(
@@ -84,55 +97,61 @@ def load_data(session, df):
         session.bulk_save_objects(objects_to_load)
         session.commit()
         end_bulk_time = time.time()
-        print(f"Carga concluída com sucesso em {end_bulk_time - start_bulk_time:.2f}s.")
+        print(f"Carga completa concluída com sucesso em {end_bulk_time - start_bulk_time:.2f}s.")
 
-def process_financial_reports():
-    current_year = datetime.now().year
-    years_to_try = [current_year, current_year - 1]
-    df = None
-    for year in years_to_try:
-        try:
-            df = download_and_extract_data(year)
-            if df is not None: break
-        except requests.exceptions.RequestException as e:
-            print(f"ERRO DE REDE ao tentar baixar dados para o ano {year}: {e}")
-            df = None; break
-    if df is None:
-        print("FALHA NO ETL: Não foi possível baixar os dados. Abortando.")
+def process_historical_financial_reports():
+    START_YEAR = 2010
+    end_year = datetime.now().year
+    report_types = ['DFP', 'ITR']
+    all_dfs = []
+
+    print("="*80)
+    print("INICIANDO PROCESSO DE CARGA HISTÓRICA COMPLETA")
+    print(f"Período: {START_YEAR} a {end_year} | Documentos: {report_types}")
+    print("="*80)
+
+    for year in range(START_YEAR, end_year + 1):
+        for doc_type in report_types:
+            df = download_and_extract_data(year, doc_type)
+            if df is not None:
+                all_dfs.append(df)
+
+    if not all_dfs:
+        print("
+FALHA NO ETL: Nenhum dado foi baixado. Abortando.")
         return
+
+    print("
+Concatenando todos os dataframes baixados...")
+    final_df = pd.concat(all_dfs, ignore_index=True)
+    print(f"Total de {len(final_df)} registros brutos encontrados.")
 
     with app.app_context():
         db_engine = db.engine
         Session = sessionmaker(bind=db_engine)
         session = Session()
         try:
-            # PASSO 1: Buscar todos os CNPJs válidos da nossa tabela 'companies'.
             print("Buscando a lista de empresas válidas no banco de dados...")
             valid_cnpjs = {c.cnpj for c in session.query(Company.cnpj).all()}
             print(f"Encontradas {len(valid_cnpjs)} empresas na tabela 'companies'.")
 
-            # PASSO 2: Limpar os CNPJs do DataFrame e filtrar.
-            print("Limpando e validando CNPJs do arquivo baixado...")
-            original_rows = len(df)
-            df['CNPJ_CIA'] = df['CNPJ_CIA'].apply(clean_cnpj)
-            
-            # Filtra o DataFrame, mantendo apenas as linhas cujo CNPJ existe na nossa tabela 'companies'
-            df_filtered = df[df['CNPJ_CIA'].isin(valid_cnpjs)]
+            print("Limpando e validando CNPJs do DataFrame consolidado...")
+            original_rows = len(final_df)
+            final_df['CNPJ_CIA'] = final_df['CNPJ_CIA'].apply(clean_cnpj)
+            df_filtered = final_df[final_df['CNPJ_CIA'].isin(valid_cnpjs)]
             filtered_rows = len(df_filtered)
-            
             if filtered_rows < original_rows:
-                print(f"AVISO: {original_rows - filtered_rows} registros foram descartados por não corresponderem a nenhuma empresa na tabela 'companies'.")
+                print(f"AVISO: {original_rows - filtered_rows} registros foram descartados por não corresponderem a uma empresa na tabela 'companies'.")
 
             if df_filtered.empty:
                 print("Nenhum registro válido para carregar após o filtro. Abortando.")
                 return
 
-            # PASSO 3: Proceder com a carga dos dados já limpos e validados.
             truncate_table(session)
             load_data(session, df_filtered)
         finally:
             session.close()
 
 if __name__ == '__main__':
-    process_financial_reports()
+    process_historical_financial_reports()
     print("Script de ETL finalizado.")
