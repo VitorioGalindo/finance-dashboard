@@ -1,4 +1,4 @@
-# backend/routes/companies_routes.py (VERSÃO DE DEPURAÇÃO CORRIGIDA)
+# backend/routes/companies_routes.py (VERSÃO DE DEPURAÇÃO FINAL E CORRIGIDA)
 from flask import Blueprint, jsonify
 from backend.models import Company
 import sys
@@ -18,9 +18,8 @@ def get_companies():
         # Itera sobre cada empresa para encontrar a que causa o erro
         for i, company in enumerate(companies):
             try:
-                # Tenta criar o dicionário. Se a linha abaixo falhar, a exceção será capturada.
-                # O problema geralmente ocorre quando 'jsonify' tenta ler 'company.name'.
-                # Vamos forçar a leitura aqui para depurar.
+                # Tenta criar o dicionário. O problema geralmente ocorre quando 'jsonify'
+                # tenta ler 'company.name'. Vamos forçar a leitura aqui para depurar.
                 
                 current_name = company.name
                 # Imprime no log do console do Flask para vermos o progresso
@@ -39,12 +38,13 @@ def get_companies():
                 print("
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", file=sys.stderr)
-                print(f"!!! ERRO DETECTADO AO PROCESSAR A EMPRESA ABAIXO:", file=sys.stderr)
+                print("!!! ERRO DETECTADO AO PROCESSAR A EMPRESA ABAIXO:", file=sys.stderr)
                 print(f"!!! CNPJ Problemático: {company.cnpj}", file=sys.stderr)
                 print(f"!!! Erro de Decodificação: {e_inner}", file=sys.stderr)
                 print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ", file=sys.stderr)
+                
                 # Retorna um erro imediatamente para sabermos que encontramos o problema
                 return jsonify({
                     "error": "Erro de codificação detectado em uma empresa específica. Verifique o log do console do Flask.",
