@@ -9,10 +9,17 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'uma-chave-secreta-padrao-muito-segura'
 
     # Configurações do SQLAlchemy
-    # ADICIONANDO 'client_encoding=latin1' de volta à string de conexão do SQLAlchemy.
-    # Agora que sabemos que os dados no DB estão limpos, isso deve instruir o SQLAlchemy
-    # a interpretar corretamente os dados que o PostgreSQL envia.
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        f"postgresql+psycopg2://{os.environ.get('DB_USER')}:{os.environ.get('DB_PASSWORD')}@{os.environ.get('DB_HOST')}/{os.environ.get('DB_NAME')}?sslmode=require&client_encoding=latin1"
+    # CORREÇÃO: A f-string foi movida para a mesma linha da atribuição da variável.
+    # Adicionamos client_encoding='utf8' para garantir que o Python e o PostgreSQL
+    # conversem usando a mesma codificação (UTF-8), que é o padrão moderno.
+    DB_USER = os.environ.get('DB_USER')
+    DB_PASSWORD = os.environ.get('DB_PASSWORD')
+    DB_HOST = os.environ.get('DB_HOST')
+    DB_NAME = os.environ.get('DB_NAME')
     
+    SQLALCHEMY_DATABASE_URI = (
+        f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
+        "?sslmode=require"
+    )
+
     SQLALCHEMY_TRACK_MODIFICATIONS = False
