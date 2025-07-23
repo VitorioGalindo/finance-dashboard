@@ -73,8 +73,7 @@ def load_data(session, df):
     # (Esta função está correta e permanece a mesma)
     objects_to_load = []
     total_rows = len(df)
-    print(f"
-Iniciando a preparação de {total_rows} registros para a carga...")
+    print(f"Iniciando a preparação de {total_rows} registros para a carga...")
     start_time = time.time()
     for index, row in df.iterrows():
         statement = FinancialStatement(
