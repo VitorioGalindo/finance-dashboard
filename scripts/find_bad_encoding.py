@@ -2,6 +2,7 @@
 import os
 from dotenv import load_dotenv
 import psycopg2
+import sys
 
 def get_db_connection_string():
     """Lê as credenciais do .env e cria uma string de conexão para o RDS."""
@@ -55,9 +56,11 @@ def find_bad_encoding_company():
 ")
                 # Tenta mostrar os bytes brutos para análise
                 try:
-                    print(f"Bytes brutos do nome: {name.encode('latin1')}")
-                except:
-                    pass
+                    # Tenta encodar como latin1 para ver os bytes
+                    raw_bytes = name.encode('latin1')
+                    print(f"Bytes brutos do nome: {raw_bytes}")
+                except Exception as inner_e:
+                    print(f"Não foi possível obter os bytes brutos: {inner_e}")
                 break # Para no primeiro erro
 
     except Exception as e:
