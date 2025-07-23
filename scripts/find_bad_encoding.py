@@ -45,15 +45,15 @@ def find_bad_encoding_company():
                 # processar a string recebida do banco.
                 print(f"OK [{row_count}]: CNPJ={cnpj}, Name='{name}'")
             except UnicodeDecodeError as e:
-                print("
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                # CORREÇÃO: Usando aspas triplas para strings multi-linha
+                print("""
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!""")
                 print("!!! ERRO DE CODIFICAÇÃO ENCONTRADO!")
                 print(f"!!! CNPJ Problemático: {cnpj}")
                 print(f"!!! Detalhe do Erro: {e}")
-                print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-")
+                # CORREÇÃO: Usando aspas triplas para strings multi-linha
+                print("""!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+""")
                 # Tenta mostrar os bytes brutos para análise
                 try:
                     print(f"Bytes brutos do nome: {name.encode('latin1')}")
@@ -62,8 +62,9 @@ def find_bad_encoding_company():
                 break # Para no primeiro erro
 
     except Exception as e:
-        print(f"
-Ocorreu um erro durante o processo: {e}")
+        # CORREÇÃO: Usando aspas triplas para strings multi-linha
+        print(f"""
+Ocorreu um erro durante o processo: {e}""")
     finally:
         if cur: cur.close()
         if conn: conn.close()
