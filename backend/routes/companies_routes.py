@@ -1,34 +1,34 @@
 # backend/routes/companies_routes.py
 from flask import Blueprint, jsonify
 from backend.models import Company
-import traceback # Importar o traceback para logs detalhados
+import traceback
 
-companies_bp = Blueprint('companies_bp', __name__, url_prefix='/api/companies')
+# CORREÇÃO: O prefixo da URL foi simplificado para /api.
+# O nome do recurso ('companies') foi movido para cada rota individualmente.
+# Isso elimina a ambiguidade que causava o roteamento incorreto.
+companies_bp = Blueprint('companies_bp', __name__, url_prefix='/api')
 
-@companies_bp.route('/', methods=['GET'])
+# ROTA CORRIGIDA: Agora explicitamente /companies
+@companies_bp.route('/companies', methods=['GET'])
 def get_companies():
     """
     Retorna uma lista de todas as empresas cadastradas.
     """
     try:
         companies = Company.query.all()
-        # A serialização acontece aqui, este é um ponto de falha comum.
         return jsonify([company.to_dict() for company in companies])
     except Exception as e:
-        # CORREÇÃO: Melhora no log de erro.
-        # Imprime o stack trace completo do erro no console do Flask.
-        # Isso nos dará a causa exata do erro 500.
         print("="*80)
         print(f"ERRO DETALHADO em get_companies: {e}")
         traceback.print_exc()
         print("="*80)
-        # Retorna uma mensagem de erro mais informativa para o frontend.
         return jsonify({
             "error": "Ocorreu um erro interno no servidor ao processar os dados das empresas.",
             "details": str(e)
         }), 500
 
-@companies_bp.route('/<string:cnpj>', methods=['GET'])
+# ROTA CORRIGIDA: Agora explicitamente /companies/<cnpj>
+@companies_bp.route('/companies/<string:cnpj>', methods=['GET'])
 def get_company_by_cnpj(cnpj):
     """
     Retorna os dados de uma empresa específica com base no CNPJ.
@@ -39,7 +39,7 @@ def get_company_by_cnpj(cnpj):
         )
         return jsonify(company.to_dict())
     except Exception as e:
-        # CORREÇÃO: Melhora no log de erro.
+        # Este bloco agora só será acionado por erros genuínos, não por falhas de roteamento.
         print("="*80)
         print(f"ERRO DETALHADO em get_company_by_cnpj para CNPJ {cnpj}: {e}")
         traceback.print_exc()
