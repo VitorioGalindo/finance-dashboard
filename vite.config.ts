@@ -12,6 +12,17 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      // --- Configuração de Proxy para o Backend ---
+      server: {
+        proxy: {
+          '/api': {
+            target: 'http://127.0.0.1:5000', // Endereço do seu backend Flask
+            changeOrigin: true, // Necessário para hosts virtuais
+            rewrite: (path) => path.replace(/^/api/, ''), // Remove /api do path enviado para o backend
+          },
+        },
+      },
+      // --- Fim da Configuração de Proxy ---
     };
 });
