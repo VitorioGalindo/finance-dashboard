@@ -63,8 +63,7 @@ def run_ipe_etl_pipeline():
     anos_para_buscar = range(2010, datetime.now().year + 1)
     
     for ano in anos_para_buscar:
-        print(f"
---- Processando IPE para o ano: {ano} ---")
+        print(f"--- Processando IPE para o ano: {ano} ---")
         try:
             url = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/IPE/DADOS/ipe_cia_aberta_{ano}.zip"
             response = requests.get(url, timeout=180)
@@ -113,8 +112,7 @@ def run_ipe_etl_pipeline():
         except Exception as e:
             print(f"  -> ERRO DESCONHECIDO no processamento do ano {ano}: {e}")
 
-    print("
---- CARGA COMPLETA PARA 'cvm_documents' CONCLUÍDA! ---")
+    print("--- CARGA COMPLETA PARA 'cvm_documents' CONCLUÍDA! ---")
 
 if __name__ == "__main__":
     run_ipe_etl_pipeline()
