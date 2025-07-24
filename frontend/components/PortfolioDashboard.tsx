@@ -31,7 +31,6 @@ interface PortfolioMetricData {
     metric_value: number;
 }
 
-// --- NOVO TIPO PARA DADOS DE COTAÇÃO ---
 interface RealtimeQuoteData {
     ticker: string;
     last_price: number;
@@ -39,7 +38,6 @@ interface RealtimeQuoteData {
     updated_at: string;
 }
 
-// --- NOVO TIPO PARA O RESULTADO DA API DE COTAÇÕES ---
 type QuotesMap = {
     [key: string]: RealtimeQuoteData;
 }
@@ -52,17 +50,19 @@ const PortfolioDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const backendUrl = 'http://127.0.0.1:5000'; // URL base do backend
+
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setLoading(true);
                 
-                // --- ATUALIZAÇÃO: Busca os dados de cotação em tempo real junto com os outros ---
+                // --- ATUALIZAÇÃO: Usa URLs absolutas para bypassar o proxy do Vite ---
                 const [configRes, historyRes, metricsRes, quotesRes] = await Promise.all([
-                    fetch('/api/portfolio/config'),
-                    fetch('/api/portfolio/history'),
-                    fetch('/api/portfolio/metrics'),
-                    fetch('/api/portfolio/quotes') // <-- Nova chamada de API
+                    fetch(`${backendUrl}/api/portfolio/config`),
+                    fetch(`${backendUrl}/api/portfolio/history`),
+                    fetch(`${backendUrl}/api/portfolio/metrics`),
+                    fetch(`${backendUrl}/api/portfolio/quotes`)
                 ]);
 
                 if (!configRes.ok || !historyRes.ok || !metricsRes.ok || !quotesRes.ok) {
@@ -72,9 +72,8 @@ const PortfolioDashboard: React.FC = () => {
                 const configData: PortfolioConfigData[] = await configRes.json();
                 const historyData: PortfolioHistoryData[] = await historyRes.json();
                 const metricsData: PortfolioMetricData[] = await metricsRes.json();
-                const quotesData: QuotesMap = await quotesRes.json(); // <-- Novos dados
+                const quotesData: QuotesMap = await quotesRes.json();
 
-                // --- ATUALIZAÇÃO: Processa os dados usando as cotações reais ---
                 const processedAssets: Asset[] = configData.map(item => {
                     const quote = quotesData[item.ticker];
                     const price = quote ? quote.last_price : 0;
@@ -90,15 +89,13 @@ const PortfolioDashboard: React.FC = () => {
                         price: price,
                         dailyChange: dailyChange,
                         positionValue: positionValue,
-                        // Os campos abaixo ainda precisam de cálculos mais complexos
-                        contribution: (Math.random() - 0.5) * 0.5, // Placeholder
-                        positionPercent: 0, // Será calculado depois
-                        difference: 0, // Será calculado depois
-                        adjustment: 0, // Será calculado depois
+                        contribution: (Math.random() - 0.5) * 0.5,
+                        positionPercent: 0,
+                        difference: 0,
+                        adjustment: 0,
                     };
                 });
                 
-                // Calcula o valor total do portfólio para os percentuais
                 const totalPortfolioValue = processedAssets.reduce((sum, asset) => sum + asset.positionValue, 0);
 
                 const finalAssets = processedAssets.map(asset => ({
@@ -109,7 +106,6 @@ const PortfolioDashboard: React.FC = () => {
                 
                 setAssets(finalAssets);
                 
-                // O resto da lógica permanece o mesmo...
                 if (historyData.length > 0) {
                     const latestHistory = historyData[historyData.length - 1];
                     setSummary({
@@ -139,14 +135,10 @@ const PortfolioDashboard: React.FC = () => {
         };
 
         fetchData();
-        // Adiciona um intervalo para atualizar os dados a cada 30 segundos
         const intervalId = setInterval(fetchData, 30000); 
-
-        // Limpa o intervalo quando o componente é desmontado
         return () => clearInterval(intervalId);
     }, []);
 
-    // ... (o resto do código do componente permanece o mesmo) ...
     const contributionData = assets.map(a => ({ name: a.ticker, value: a.adjustment })).sort((a,b) => b.value - a.value);
     const returnData = history.map(h => ({
         name: new Date(h.date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit'}),
@@ -161,7 +153,7 @@ const PortfolioDashboard: React.FC = () => {
         targetWeight: a.targetPercent
     }));
 
-    if (loading && assets.length === 0) { // Mostra o loading apenas na primeira carga
+    if (loading && assets.length === 0) {
         return <div className="text-center text-slate-400 p-8">Carregando dados do portfólio...</div>;
     }
 
@@ -169,7 +161,6 @@ const PortfolioDashboard: React.FC = () => {
         return <div className="bg-red-900/50 border border-red-700 text-red-300 p-4 rounded-lg text-center">Erro: {error}</div>;
     }
     
-    // (O JSX do return permanece o mesmo)
     return (
         <div className="space-y-6">
             <PortfolioManager initialAssets={editableAssets} />
