@@ -20,12 +20,31 @@ def get_db_engine_vm():
         raise ValueError("Credenciais do banco não encontradas no arquivo .env")
     return create_engine(f"postgresql+psycopg2://{user}:{password}@{host}/{dbname}?sslmode=require", echo=False)
 
-def process_and_load_chunk(df_chunk, connection):
+def process_and_load_chunk(df_chunk, connection, cnpjs_to_process):
+    """
+    Filtra, mapeia, transforma e carrega um chunk de dados.
+    """
     df_chunk.columns = [col.lower() for col in df_chunk.columns]
     
+    # Garante que a coluna de CNPJ exista antes de filtrar
+    if 'cnpj_companhia' not in df_chunk.columns:
+        return # Se o chunk não tem a coluna, não há o que fazer
+
+    # Limpa a coluna CNPJ para fazer a correspondência
+    df_chunk['cnpj_companhia'] = df_chunk['cnpj_companhia'].str.replace(r'\D', '', regex=True)
+
+    # **LÓGICA CORRETA**: Filtra o DataFrame para manter apenas os CNPJs de interesse
+    df_chunk_filtered = df_chunk[df_chunk['cnpj_companhia'].isin(cnpjs_to_process)]
+
+    # Se o lote ficou vazio após o filtro, não há mais nada a fazer
+    if df_chunk_filtered.empty:
+        return
+
+    df_to_load = df_chunk_filtered.copy()
+
     date_columns = ['data_referencia', 'data_entrega']
     for col in date_columns:
-        df_chunk[col] = pd.to_datetime(df_chunk[col], errors='coerce')
+        df_to_load[col] = pd.to_datetime(df_to_load[col], errors='coerce')
 
     column_mapping = {
         'cnpj_companhia': 'company_cnpj', 'nome_companhia': 'company_name', 'codigo_cvm': 'cvm_code',
@@ -34,16 +53,11 @@ def process_and_load_chunk(df_chunk, connection):
         'protocolo_entrega': 'delivery_protocol', 'link_download': 'download_link'
     }
     
-    df_chunk = df_chunk.rename(columns=column_mapping)
-    
-    if 'company_cnpj' in df_chunk.columns:
-        df_chunk['company_cnpj'] = df_chunk['company_cnpj'].str.replace(r'\D', '', regex=True)
+    df_to_load = df_to_load.rename(columns=column_mapping)
         
     final_columns = list(column_mapping.values())
-    df_final = df_chunk[[col for col in final_columns if col in df_chunk.columns]]
+    df_final = df_to_load[[col for col in final_columns if col in df_to_load.columns]]
 
-    # O if_exists='append' garante que ele apenas insira dados.
-    # Se a tabela não existir, ele falhará, o que é o comportamento desejado.
     df_final.to_sql(
         'cvm_documents',
         connection, 
@@ -53,15 +67,31 @@ def process_and_load_chunk(df_chunk, connection):
     )
 
 def run_ipe_etl_pipeline():
-    print("--- INICIANDO PIPELINE ETL PARA 'cvm_documents' (MODO APPEND) ---")
+    print("--- INICIANDO PIPELINE ETL OTIMIZADO PARA 'cvm_documents' ---")
     engine = get_db_engine_vm()
-    
-    # Removida a lógica de TRUNCATE/DROP.
-    # O script agora assume que a tabela existe e está pronta para receber dados.
-    # A limpeza da tabela deve ser uma tarefa administrativa separada, se necessário.
 
+    # --- PASSO 1: Obter a lista de CNPJs de interesse ---
+    try:
+        with engine.connect() as connection:
+            result = connection.execute(text("SELECT cnpj FROM companies;"))
+            # Usa um set para uma busca O(1), que é extremamente rápida
+            company_cnpjs_set = {row[0] for row in result}
+        print(f"Encontradas {len(company_cnpjs_set)} empresas na tabela 'companies' para processar.")
+    except SQLAlchemyError as e:
+        print(f"ERRO CRÍTICO: Não foi possível ler a tabela 'companies'. Detalhes: {e}")
+        return
+
+    # --- PASSO 2: Limpar a tabela de destino antes de uma nova carga ---
+    try:
+        with engine.begin() as connection:
+            # Não precisamos mais de CASCADE, pois não estamos tocando em 'companies'
+            connection.execute(text("TRUNCATE TABLE cvm_documents RESTART IDENTITY;"))
+        print("Tabela 'cvm_documents' limpa e pronta para nova carga.")
+    except SQLAlchemyError as e:
+        print(f"AVISO: A tabela 'cvm_documents' não pôde ser limpa (pode não existir). Erro: {e}")
+
+    # --- PASSO 3: Processar os arquivos da CVM filtrando pelos CNPJs de interesse ---
     anos_para_buscar = range(2010, datetime.now().year + 1)
-    
     for ano in anos_para_buscar:
         print(f"--- Processando IPE para o ano: {ano} ---")
         try:
@@ -83,7 +113,7 @@ def run_ipe_etl_pipeline():
                                 
                                 header = next(reader)
                                 batch = []
-                                batch_size = 10000
+                                batch_size = 20000
 
                                 for i, row in enumerate(reader):
                                     batch.append(row)
@@ -91,7 +121,7 @@ def run_ipe_etl_pipeline():
                                         try:
                                             with engine.begin() as connection:
                                                 df_chunk = pd.DataFrame(batch, columns=header)
-                                                process_and_load_chunk(df_chunk, connection)
+                                                process_and_load_chunk(df_chunk, connection, company_cnpjs_set)
                                         except SQLAlchemyError as e:
                                             print(f"     -> ERRO em lote. Lote ignorado. Detalhes: {str(e)[:200]}...")
                                         finally:
@@ -101,18 +131,15 @@ def run_ipe_etl_pipeline():
                                     try:
                                         with engine.begin() as connection:
                                             df_chunk = pd.DataFrame(batch, columns=header)
-                                            process_and_load_chunk(df_chunk, connection)
+                                            process_and_load_chunk(df_chunk, connection, company_cnpjs_set)
                                     except SQLAlchemyError as e:
                                         print(f"     -> ERRO no lote final. Lote ignorado. Detalhes: {str(e)[:200]}...")
                         except Exception as e:
                             print(f"     -> ERRO CRÍTICO ao processar o arquivo {file_info.filename}: {e}")
-
-        except requests.exceptions.RequestException as e:
-            print(f"  -> ERRO DE REDE ao baixar o ZIP do ano {ano}: {e}")
         except Exception as e:
             print(f"  -> ERRO DESCONHECIDO no processamento do ano {ano}: {e}")
 
-    print("--- CARGA COMPLETA PARA 'cvm_documents' CONCLUÍDA! ---")
+    print("--- CARGA COMPLETA E OTIMIZADA PARA 'cvm_documents' CONCLUÍDA! ---")
 
 if __name__ == "__main__":
     run_ipe_etl_pipeline()
