@@ -12,7 +12,8 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "@google/genai": "^1.10.0",
-    "recharts": "^3.1.0"
+    "recharts": "^3.1.0",
+    "lucide-react": "latest"  // Adicionado lucide-react
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
