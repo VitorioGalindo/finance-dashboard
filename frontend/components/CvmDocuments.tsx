@@ -1,99 +1,155 @@
-import React from 'react';
-import { CvmDocument } from '../types';
-import { DocumentTextIcon, ChevronDownIcon, ArrowTopRightOnSquareIcon } from '../constants';
 
-const mockDocuments: CvmDocument[] = [
-    { id: '1', date: '18/07/2025', company: 'PRIO S.A.', category: 'Comunicado ao Mercado', subject: '', link: '#' },
-    { id: '2', date: '18/07/2025', company: 'PRIO S.A.', category: 'Fato Relevante', subject: '', link: '#' },
-    { id: '3', date: '17/07/2025', company: 'PRIO S.A.', category: 'Calendário de Eventos Corporativos', subject: '', link: '#' },
-    { id: '4', date: '16/07/2025', company: 'PRIO S.A.', category: 'Fato Relevante', subject: 'Liquidação da 6ª Emissão de Debêntures', link: '#' },
-    { id: '5', date: '04/07/2025', company: 'PRIO S.A.', category: 'Fato Relevante', subject: '', link: '#' },
-    { id: '6', date: '04/07/2025', company: 'PRIO S.A.', category: 'Reunião da Administração', subject: 'Aditamento - 6ª Emissão Debêntures', link: '#' },
-    { id: '7', date: '03/07/2025', company: 'PRIO S.A.', category: 'Valores Mobiliários negociados e detidos (art. 11 da Instr. CVM nº 358)', subject: '', link: '#' },
-    { id: '8', date: '03/07/2025', company: 'PRIO S.A.', category: 'Comunicado ao Mercado', subject: 'Dados Operacionais - Junho/2025', link: '#' },
-    { id: '9', date: '03/07/2025', company: 'PRIO S.A.', category: 'Valores Mobiliários negociados e detidos (art. 11 da Instr. CVM nº 358)', subject: '', link: '#' },
-    { id: '10', date: '30/06/2025', company: 'PRIO S.A.', category: 'Relatório de Sustentabilidade', subject: '', link: '#' },
-];
+import React, { useState, useEffect } from 'react';
+import { Filing, FilingDisplay } from '../types';
+import { Search, DownloadCloud, FileText } from 'lucide-react';
 
-const FilterDropdown: React.FC<{ label: string; options: string[]; selected: string; className?: string; selectedClassName?: string }> = 
-({ label, options, selected, className, selectedClassName }) => {
-    return (
-        <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1">{label}</label>
-            <div className="relative">
-                <select defaultValue={selected} className={`w-full appearance-none bg-slate-700 border border-slate-600 rounded-md py-2 px-3 text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 ${className} ${selectedClassName}`}>
-                    {options.map(opt => <option key={opt}>{opt}</option>)}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
-                    <ChevronDownIcon />
-                </div>
-            </div>
-        </div>
-    );
+const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    }).format(date);
 };
 
-
 const CvmDocuments: React.FC = () => {
+    const [documents, setDocuments] = useState<FilingDisplay[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [cnpj, setCnpj] = useState('09346601000125'); // B3 CNPJ as default
+    const [searchTerm, setSearchTerm] = useState('09346601000125');
+
+    const fetchDocuments = async (currentCnpj: string) => {
+        if (!currentCnpj) {
+            setError('Por favor, insira um CNPJ válido.');
+            setDocuments([]);
+            return;
+        }
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await fetch(`/api/companies/${currentCnpj}/documents`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Erro ao buscar documentos: ${response.statusText}`);
+            }
+            const data: Filing[] = await response.json();
+            
+            if (data.length === 0) {
+                 setError('Nenhum documento encontrado para este CNPJ.');
+            }
+
+            const formattedDocs = data.map(doc => ({
+                id: doc.id.toString(),
+                date: formatDate(doc.reference_date),
+                company: doc.company_name,
+                category: doc.category,
+                subject: doc.subject,
+                link: doc.download_link,
+            }));
+            setDocuments(formattedDocs);
+
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.');
+            setDocuments([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if(cnpj) {
+            fetchDocuments(cnpj);
+        }
+    }, []);
+
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        const cleanCnpj = searchTerm.replace(/\D/g, '');
+        setCnpj(cleanCnpj);
+        fetchDocuments(cleanCnpj);
+    };
+
     return (
-        <div className="bg-slate-800/50 rounded-lg p-6 md:p-8 space-y-6 border border-slate-700">
-            <div className="flex items-center gap-3">
-                <DocumentTextIcon className="w-8 h-8 text-sky-400" />
-                <h1 className="text-3xl font-bold text-white">Documentos CVM</h1>
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-semibold text-white">Documentos CVM (IPE)</h2>
             </div>
 
-            <div className="border-b border-slate-700 pb-6">
-                <h2 className="text-xl font-semibold text-white mb-4">Filtros</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <FilterDropdown 
-                        label="Filtrar por Empresa" 
-                        options={['PRIO3 - PRIO S.A.', 'PETR4 - PETROBRAS', 'VALE3 - VALE']}
-                        selected="PRIO3 - PRIO S.A."
-                        selectedClassName="border-red-500 ring-1 ring-red-500"
+            <form onSubmit={handleSearch} className="flex items-center gap-2">
+                <div className="relative flex-grow">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                    <input 
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Digite o CNPJ da empresa (somente números)"
+                        className="bg-slate-700 border border-slate-600 rounded-md py-2 pl-10 pr-4 w-full text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500"
                     />
-                    <FilterDropdown 
-                        label="Filtrar por Categoria"
-                        options={['Todas', 'Fato Relevante', 'Comunicado ao Mercado', 'Calendário de Eventos Corporativos']}
-                        selected="Todas"
-                    />
-                     <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">Filtrar por Período de Publicação</label>
-                        <input 
-                            type="text" 
-                            defaultValue="2025/04/23 – 2025/07/22"
-                            className="w-full bg-slate-700 border border-slate-600 rounded-md py-2 px-3 text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                        />
-                    </div>
                 </div>
-            </div>
+                <button 
+                    type="submit"
+                    disabled={loading}
+                    className="bg-sky-600 text-white px-4 py-2 rounded-md font-semibold hover:bg-sky-500 disabled:bg-slate-500 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                    {loading ? 'Buscando...' : 'Buscar'}
+                </button>
+            </form>
 
-            <div>
-                <p className="text-md font-semibold text-white mb-4">
-                    Exibindo {mockDocuments.length} documentos encontrados
-                </p>
-                <div className="overflow-x-auto border border-slate-700 rounded-lg">
-                    <table className="w-full text-sm text-left">
+            {error && (
+                <div className="bg-red-900/50 border border-red-700 text-red-300 p-3 rounded-lg text-center">
+                    {error}
+                </div>
+            )}
+            
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700 overflow-hidden">
+                <div className="overflow-x-a">
+                    <table className="w-full text-sm text-left text-slate-300">
                         <thead className="bg-slate-700/50 text-xs text-slate-400 uppercase">
                             <tr>
-                                {['Data', 'Empresa', 'Categoria', 'Assunto', 'Link'].map(h => (
-                                    <th key={h} scope="col" className="px-6 py-3 font-medium tracking-wider">{h}</th>
-                                ))}
+                                <th scope="col" className="px-6 py-3">Data Ref.</th>
+                                <th scope="col" className="px-6 py-3">Empresa</th>
+                                <th scope="col" className="px-6 py-3">Categoria</th>
+                                <th scope="col" className="px-6 py-3">Assunto</th>
+                                <th scope="col" className="px-6 py-3 text-center">Link</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-700">
-                            {mockDocuments.map((doc) => (
-                                <tr key={doc.id} className="hover:bg-slate-700/30">
-                                    <td className="px-6 py-4 whitespace-nowrap text-slate-300">{doc.date}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap font-medium text-white">{doc.company}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-slate-300">{doc.category}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-slate-300">{doc.subject}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <a href={doc.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sky-400 hover:text-sky-300 font-semibold">
-                                            Abrir
-                                            <ArrowTopRightOnSquareIcon className="w-4 h-4" />
-                                        </a>
+                        <tbody>
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={5} className="text-center py-8 text-slate-400">
+                                        <FileText className="mx-auto h-8 w-8 animate-pulse" />
+                                        <p className="mt-2">Carregando documentos...</p>
                                     </td>
                                 </tr>
-                            ))}
+                            ) : documents.length > 0 ? (
+                                documents.map((doc) => (
+                                    <tr key={doc.id} className="border-b border-slate-700 hover:bg-slate-700/40">
+                                        <td className="px-6 py-4 whitespace-nowrap">{doc.date}</td>
+                                        <td className="px-6 py-4 font-medium text-white">{doc.company}</td>
+                                        <td className="px-6 py-4">{doc.category}</td>
+                                        <td className="px-6 py-4 max-w-sm truncate" title={doc.subject}>{doc.subject}</td>
+                                        <td className="px-6 py-4 text-center">
+                                            <a 
+                                                href={doc.link} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer" 
+                                                className="text-sky-400 hover:text-sky-300 transition-colors"
+                                                title="Baixar documento"
+                                            >
+                                                <DownloadCloud className="h-5 w-5 mx-auto"/>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : !error && (
+                                 <tr>
+                                    <td colSpan={5} className="text-center py-8 text-slate-500">
+                                        Nenhum documento para exibir. Realize uma busca.
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>

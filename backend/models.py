@@ -1,9 +1,8 @@
-# backend/models.py
-# CORREÇÃO: Importa o 'db' do ponto centralizado em __init__.py
+
 from . import db
 from sqlalchemy.sql import func
 from sqlalchemy import (
-    String, Integer, DateTime, Float, ForeignKey, Date, Numeric, Text
+    String, Integer, DateTime, Date, Numeric, Text, ForeignKey
 )
 from sqlalchemy.orm import relationship
 
@@ -15,41 +14,36 @@ class Company(db.Model):
     created_at = db.Column(DateTime(timezone=True), server_default=func.now())
     updated_at = db.Column(DateTime(timezone=True), onupdate=func.now())
 
-    statements = relationship(
-        "FinancialStatement", 
-        back_populates="company", 
-        cascade="all, delete-orphan"
-    )
+    statements = relationship("FinancialStatement", back_populates="company", cascade="all, delete-orphan")
+    filings = relationship("Filing", back_populates="company", cascade="all, delete-orphan")
 
     def to_dict(self):
         return {
             'cnpj': self.cnpj,
             'name': self.name,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
 
 class FinancialStatement(db.Model):
     __tablename__ = 'cvm_dados_financeiros'
 
     id = db.Column(Integer, primary_key=True)
-    company_cnpj = db.Column('cnpj_cia', String(20), ForeignKey('companies.cnpj'), nullable=False)
-    company_name = db.Column('denom_cia', Text)
-    cvm_code = db.Column('cd_cvm', String(10))
-    report_version = db.Column('versao', Integer)
-    reference_date = db.Column('dt_refer', Date)
-    fiscal_year_start = db.Column('dt_ini_exerc', Date)
-    fiscal_year_end = db.Column('dt_fim_exerc', Date)
-    account_code = db.Column('cd_conta', String(30))
-    account_description = db.Column('ds_conta', Text)
-    account_value = db.Column('vl_conta', Numeric)
-    currency_scale = db.Column('escala_moeda', String(10))
-    currency = db.Column('moeda', String(5))
-    fiscal_year_order = db.Column('ordem_exerc', String(10))
-    report_type = db.Column('tipo_demonstracao', String(50))
-    # CORREÇÃO DE BUG: O campo 'periodo' estava sendo preenchido com a moeda.
-    # Corrigido para ser mapeado para a coluna correta no banco.
-    period = db.Column('periodo', String(20))
+    company_cnpj = db.Column(String(20), ForeignKey('companies.cnpj'), nullable=False)
+    company_name = db.Column(Text)
+    cvm_code = db.Column(String(10))
+    report_version = db.Column(Integer)
+    reference_date = db.Column(Date)
+    fiscal_year_start = db.Column(Date)
+    fiscal_year_end = db.Column(Date)
+    account_code = db.Column(String(30))
+    account_description = db.Column(Text)
+    account_value = db.Column(Numeric)
+    currency_scale = db.Column(String(10))
+    currency = db.Column(String(5))
+    fiscal_year_order = db.Column(String(10))
+    report_type = db.Column(String(50))
+    period = db.Column(String(20))
 
     company = relationship("Company", back_populates="statements")
 
@@ -70,5 +64,39 @@ class FinancialStatement(db.Model):
             'currency': self.currency,
             'fiscal_year_order': self.fiscal_year_order,
             'report_type': self.report_type,
-            'periodo': self.period
+            'period': self.period
+        }
+
+class Filing(db.Model):
+    __tablename__ = 'filings'
+
+    id = db.Column(Integer, primary_key=True)
+    company_cnpj = db.Column(String(20), ForeignKey('companies.cnpj'), nullable=False)
+    company_name = db.Column(Text)
+    cvm_code = db.Column(String(10))
+    category = db.Column(String(100))
+    doc_type = db.Column(String(100))
+    species = db.Column(String(100))
+    subject = db.Column(Text)
+    reference_date = db.Column(Date)
+    delivery_date = db.Column(Date)
+    delivery_protocol = db.Column(String(50))
+    download_link = db.Column(Text)
+    
+    company = relationship("Company", back_populates="filings")
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'company_cnpj': self.company_cnpj,
+            'company_name': self.company_name,
+            'cvm_code': self.cvm_code,
+            'category': self.category,
+            'doc_type': self.doc_type,
+            'species': self.species,
+            'subject': self.subject,
+            'reference_date': self.reference_date.isoformat() if self.reference_date else None,
+            'delivery_date': self.delivery_date.isoformat() if self.delivery_date else None,
+            'delivery_protocol': self.delivery_protocol,
+            'download_link': self.download_link
         }

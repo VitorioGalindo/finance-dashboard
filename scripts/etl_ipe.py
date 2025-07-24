@@ -1,4 +1,4 @@
-# teste_etl_ipe.py (Versão Final - Leitura Linha a Linha)
+
 import os
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -28,20 +28,32 @@ def process_and_load_chunk(df_chunk, engine):
     try:
         df_chunk.columns = [col.lower() for col in df_chunk.columns]
         
-        colunas_data = ['data_referencia', 'data_entrega']
-        for col in colunas_data:
+        date_columns = ['data_referencia', 'data_entrega']
+        for col in date_columns:
             df_chunk[col] = pd.to_datetime(df_chunk[col], errors='coerce')
 
-        colunas_finais = {
-            'cnpj_companhia': 'cnpj_companhia', 'nome_companhia': 'nome_companhia', 'codigo_cvm': 'codigo_cvm',
-            'categoria': 'categoria', 'tipo': 'tipo', 'especie': 'especie',
-            'assunto': 'assunto', 'data_referencia': 'data_referencia', 'data_entrega': 'data_entrega',
-            'protocolo_entrega': 'protocolo_entrega', 'link_download': 'link_download'
+        column_mapping = {
+            'cnpj_companhia': 'company_cnpj',
+            'nome_companhia': 'company_name',
+            'codigo_cvm': 'cvm_code',
+            'categoria': 'category',
+            'tipo': 'doc_type',
+            'especie': 'species',
+            'assunto': 'subject',
+            'data_referencia': 'reference_date',
+            'data_entrega': 'delivery_date',
+            'protocolo_entrega': 'delivery_protocol',
+            'link_download': 'download_link'
         }
-        df_chunk = df_chunk[list(colunas_finais.keys())].rename(columns=colunas_finais)
+        
+        df_chunk = df_chunk.rename(columns=column_mapping)
+        
+        final_columns = list(column_mapping.values())
+        # Garante que apenas as colunas mapeadas e existentes no chunk sejam selecionadas
+        df_chunk = df_chunk[[col for col in final_columns if col in df_chunk.columns]]
 
         df_chunk.to_sql(
-            'cvm_documentos_ipe', 
+            'filings', # CORREÇÃO: Aponta para a tabela 'filings'
             engine, 
             if_exists='append', 
             index=False, 
@@ -52,21 +64,17 @@ def process_and_load_chunk(df_chunk, engine):
         print(f"     -> ERRO ao processar um chunk: {e}")
 
 def process_file_line_by_line(csv_file_in_zip, zip_object, engine):
-    """
-    Lê um CSV de dentro do ZIP linha por linha para economizar memória.
-    """
     file_name = csv_file_in_zip.filename
     print(f"  -> Lendo arquivo linha a linha: {file_name}...")
     
     try:
         with zip_object.open(file_name) as f:
-            # Decodifica o arquivo para texto para que o leitor de CSV funcione
             f_text = io.TextIOWrapper(f, encoding='latin-1')
             reader = csv.reader(f_text, delimiter=';')
             
-            header = next(reader) # Pega o cabeçalho
+            header = next(reader)
             batch = []
-            batch_size = 20000 # Processa em lotes de 20.000 linhas
+            batch_size = 20000 
 
             for i, row in enumerate(reader):
                 batch.append(row)
@@ -74,9 +82,8 @@ def process_file_line_by_line(csv_file_in_zip, zip_object, engine):
                     print(f"     -> Processando lote de {len(batch)} linhas...")
                     df_chunk = pd.DataFrame(batch, columns=header)
                     process_and_load_chunk(df_chunk, engine)
-                    batch = [] # Limpa o lote da memória
+                    batch = []
 
-            # Processa o último lote restante
             if batch:
                 print(f"     -> Processando lote final de {len(batch)} linhas...")
                 df_chunk = pd.DataFrame(batch, columns=header)
@@ -88,20 +95,17 @@ def process_file_line_by_line(csv_file_in_zip, zip_object, engine):
         print(f"     -> ERRO CRÍTICO ao ler ou processar o arquivo {file_name}: {e}")
 
 def run_ipe_etl_pipeline():
-    """
-    Orquestra o pipeline de ETL para documentos IPE.
-    """
-    print("--- INICIANDO PIPELINE ETL DE DOCUMENTOS IPE (LEITURA LINHA A LINHA) ---")
+    print("--- INICIANDO PIPELINE ETL DE DOCUMENTOS IPE (ALVO: 'filings') ---")
     engine = get_db_engine_vm()
     
-    print("Limpando a tabela de destino 'cvm_documentos_ipe'...")
+    print("Limpando a tabela de destino 'filings'...")
     with engine.begin() as connection:
-        connection.execute(text("TRUNCATE TABLE cvm_documentos_ipe RESTART IDENTITY;"))
+        connection.execute(text("TRUNCATE TABLE filings RESTART IDENTITY;"))
     
     anos_para_buscar = range(2010, datetime.now().year + 1)
     
     for ano in anos_para_buscar:
-        print(f"\n--- Processando documentos IPE para o ano: {ano} ---")
+        print(f"--- Processando documentos IPE para o ano: {ano} ---")
         try:
             url = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/IPE/DADOS/ipe_cia_aberta_{ano}.zip"
             response = requests.get(url, timeout=180)
@@ -118,7 +122,7 @@ def run_ipe_etl_pipeline():
         except Exception as e:
             print(f"  -> ERRO CRÍTICO ao baixar ou abrir o ZIP do ano {ano}: {e}")
 
-    print("\n--- CARGA COMPLETA DE DOCUMENTOS IPE CONCLUÍDA! ---")
+    print("--- CARGA COMPLETA DE DOCUMENTOS IPE PARA 'filings' CONCLUÍDA! ---")
 
 if __name__ == "__main__":
     run_ipe_etl_pipeline()
