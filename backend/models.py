@@ -2,7 +2,7 @@
 from . import db
 from sqlalchemy.sql import func
 from sqlalchemy import (
-    String, Integer, DateTime, Date, Numeric, Text, ForeignKey
+    String, Integer, DateTime, Date, Numeric, Text, ForeignKey, Float
 )
 from sqlalchemy.orm import relationship
 
@@ -15,7 +15,6 @@ class Company(db.Model):
     updated_at = db.Column(DateTime(timezone=True), onupdate=func.now())
 
     statements = relationship("FinancialStatement", back_populates="company", cascade="all, delete-orphan")
-    # CORREÇÃO: A relação agora aponta para o modelo CvmDocument correto
     documents = relationship("CvmDocument", back_populates="company", cascade="all, delete-orphan")
 
     def to_dict(self):
@@ -68,9 +67,8 @@ class FinancialStatement(db.Model):
             'period': self.period
         }
 
-# CORREÇÃO DEFINITIVA: Modelo que espelha a estrutura rica da tabela antiga, com nomes em inglês.
 class CvmDocument(db.Model):
-    __tablename__ = 'cvm_documents' # Nova tabela com nome padronizado
+    __tablename__ = 'cvm_documents'
 
     id = db.Column(Integer, primary_key=True)
     company_cnpj = db.Column(String(20), ForeignKey('companies.cnpj'), nullable=False)
@@ -101,4 +99,62 @@ class CvmDocument(db.Model):
             'delivery_date': self.delivery_date.isoformat() if self.delivery_date else None,
             'delivery_protocol': self.delivery_protocol,
             'download_link': self.download_link
+        }
+
+# --- NOVOS MODELOS DE PORTFÓLIO ---
+
+class PortfolioConfig(db.Model):
+    __tablename__ = 'portfolio_config'
+    
+    id = db.Column(Integer, primary_key=True)
+    ticker = db.Column(String(10), nullable=False)
+    quantity = db.Column(Integer, nullable=False)
+    target_weight = db.Column(Float, nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ticker': self.ticker,
+            'quantity': self.quantity,
+            'target_weight': self.target_weight,
+        }
+
+class PortfolioHistory(db.Model):
+    __tablename__ = 'portfolio_history'
+
+    id = db.Column(Integer, primary_key=True)
+    date = db.Column(Date, nullable=False, default=func.current_date())
+    net_liquidity = db.Column(Float)
+    quote_value = db.Column(Float)
+    daily_change = db.Column(Float)
+    buy_position = db.Column(Float)
+    sell_position = db.Column(Float)
+    net_long = db.Column(Float)
+    exposure = db.Column(Float)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'date': self.date.isoformat() if self.date else None,
+            'net_liquidity': self.net_liquidity,
+            'quote_value': self.quote_value,
+            'daily_change': self.daily_change,
+            'buy_position': self.buy_position,
+            'sell_position': self.sell_position,
+            'net_long': self.net_long,
+            'exposure': self.exposure,
+        }
+
+class PortfolioMetric(db.Model):
+    __tablename__ = 'portfolio_metrics'
+
+    id = db.Column(Integer, primary_key=True)
+    metric_name = db.Column(String(100), nullable=False)
+    metric_value = db.Column(Float, nullable=False)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'metric_name': self.metric_name,
+            'metric_value': self.metric_value,
         }

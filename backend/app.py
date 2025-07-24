@@ -25,13 +25,15 @@ def create_app(test_config=None):
     db.init_app(app)
 
     # --- Registro dos Blueprints (Rotas) ---
-    # Importa e registra o blueprint de 'companies'
     from backend.routes.companies_routes import companies_bp
     app.register_blueprint(companies_bp)
     
-    # Importa e registra o novo blueprint de 'AI'
     from backend.routes.ai_routes import ai_bp
     app.register_blueprint(ai_bp)
+    
+    # Registra o novo blueprint de Portfólio
+    from backend.routes.portfolio_routes import portfolio_bp
+    app.register_blueprint(portfolio_bp)
     
     with app.app_context():
         # Importa os modelos aqui para que o SQLAlchemy os reconheça
