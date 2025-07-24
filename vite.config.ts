@@ -13,16 +13,16 @@ export default defineConfig(({ mode }) => {
           '@': path.resolve(__dirname, '.'),
         }
       },
-      // --- Configuração de Proxy para o Backend ---
       server: {
         proxy: {
+          // As chamadas para /api serão redirecionadas para o backend
           '/api': {
-            target: 'http://127.0.0.1:5000', // Endereço do seu backend Flask
-            changeOrigin: true, // Necessário para hosts virtuais
-            rewrite: (path) => path.replace(/^/api/, ''), // Remove /api do path enviado para o backend
+            target: 'http://127.0.0.1:5000',
+            changeOrigin: true,
+            // A linha 'rewrite' foi removida.
+            // Agora, uma chamada para /api/portfolio/config será enviada como tal para o backend.
           },
         },
       },
-      // --- Fim da Configuração de Proxy ---
     };
 });
