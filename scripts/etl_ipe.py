@@ -27,32 +27,25 @@ def process_and_load_chunk(df_chunk, connection):
     for col in date_columns:
         df_chunk[col] = pd.to_datetime(df_chunk[col], errors='coerce')
 
-    # Mapeamento para os nomes de coluna em inglês do novo modelo CvmDocument
     column_mapping = {
-        'cnpj_companhia': 'company_cnpj',
-        'nome_companhia': 'company_name',
-        'codigo_cvm': 'cvm_code',
-        'categoria': 'category',
-        'tipo': 'doc_type',
-        'especie': 'species',
-        'assunto': 'subject',
-        'data_referencia': 'reference_date',
-        'data_entrega': 'delivery_date',
-        'protocolo_entrega': 'delivery_protocol',
-        'link_download': 'download_link'
+        'cnpj_companhia': 'company_cnpj', 'nome_companhia': 'company_name', 'codigo_cvm': 'cvm_code',
+        'categoria': 'category', 'tipo': 'doc_type', 'especie': 'species',
+        'assunto': 'subject', 'data_referencia': 'reference_date', 'data_entrega': 'delivery_date',
+        'protocolo_entrega': 'delivery_protocol', 'link_download': 'download_link'
     }
     
     df_chunk = df_chunk.rename(columns=column_mapping)
     
-    # Garante que o CNPJ seja apenas números
     if 'company_cnpj' in df_chunk.columns:
         df_chunk['company_cnpj'] = df_chunk['company_cnpj'].str.replace(r'\D', '', regex=True)
         
     final_columns = list(column_mapping.values())
     df_final = df_chunk[[col for col in final_columns if col in df_chunk.columns]]
 
+    # O if_exists='append' garante que ele apenas insira dados.
+    # Se a tabela não existir, ele falhará, o que é o comportamento desejado.
     df_final.to_sql(
-        'cvm_documents',  # CORREÇÃO: Aponta para a nova tabela correta
+        'cvm_documents',
         connection, 
         if_exists='append', 
         index=False, 
@@ -60,31 +53,18 @@ def process_and_load_chunk(df_chunk, connection):
     )
 
 def run_ipe_etl_pipeline():
-    print("--- INICIANDO PIPELINE ETL PARA 'cvm_documents' ---")
+    print("--- INICIANDO PIPELINE ETL PARA 'cvm_documents' (MODO APPEND) ---")
     engine = get_db_engine_vm()
     
-    # TRUNCATE não funciona em tabelas que não existem. O ideal é deixar o SQLAlchemy criar.
-    # A lógica de criação da tabela está em `backend/app.py` (db.create_all()).
-    # Para garantir uma carga limpa, podemos tentar apagar e recriar.
-    print("Garantindo que a tabela 'cvm_documents' esteja limpa...")
-    try:
-        with engine.begin() as connection:
-            # Apaga a tabela se ela existir, junto com quaisquer dependências
-            connection.execute(text("DROP TABLE IF EXISTS cvm_documents CASCADE;"))
-            print("Tabela 'cvm_documents' antiga (se existiu) removida.")
-            # O SQLAlchemy irá recriar a tabela com o esquema correto na inicialização do app
-    except SQLAlchemyError as e:
-        print(f"AVISO: Não foi possível apagar a tabela 'cvm_documents'. Pode ser a primeira execução. Erro: {e}")
-
-
-    print("Execute o aplicativo Flask principal (`backend/app.py`) em um terminal separado para criar a tabela 'cvm_documents' antes de prosseguir com a carga de dados.")
-    input("Pressione Enter quando o aplicativo Flask estiver em execução e a tabela tiver sido criada...")
-
+    # Removida a lógica de TRUNCATE/DROP.
+    # O script agora assume que a tabela existe e está pronta para receber dados.
+    # A limpeza da tabela deve ser uma tarefa administrativa separada, se necessário.
 
     anos_para_buscar = range(2010, datetime.now().year + 1)
     
     for ano in anos_para_buscar:
-        print(f"--- Processando IPE para o ano: {ano} ---")
+        print(f"
+--- Processando IPE para o ano: {ano} ---")
         try:
             url = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/IPE/DADOS/ipe_cia_aberta_{ano}.zip"
             response = requests.get(url, timeout=180)
@@ -133,7 +113,8 @@ def run_ipe_etl_pipeline():
         except Exception as e:
             print(f"  -> ERRO DESCONHECIDO no processamento do ano {ano}: {e}")
 
-    print("--- CARGA COMPLETA PARA 'cvm_documents' CONCLUÍDA! ---")
+    print("
+--- CARGA COMPLETA PARA 'cvm_documents' CONCLUÍDA! ---")
 
 if __name__ == "__main__":
     run_ipe_etl_pipeline()
