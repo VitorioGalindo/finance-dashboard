@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Filing, FilingDisplay } from '../types';
+import { CvmDocumentData } from '../types';
 import { Search, DownloadCloud, FileText } from 'lucide-react';
 
 const formatDate = (dateString: string | null) => {
@@ -14,7 +14,7 @@ const formatDate = (dateString: string | null) => {
 };
 
 const CvmDocuments: React.FC = () => {
-    const [documents, setDocuments] = useState<FilingDisplay[]>([]);
+    const [documents, setDocuments] = useState<CvmDocumentData[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [cnpj, setCnpj] = useState('09346601000125'); // B3 CNPJ as default
@@ -34,21 +34,12 @@ const CvmDocuments: React.FC = () => {
                 const errorData = await response.json();
                 throw new Error(errorData.error || `Erro ao buscar documentos: ${response.statusText}`);
             }
-            const data: Filing[] = await response.json();
+            const data: CvmDocumentData[] = await response.json();
             
             if (data.length === 0) {
-                 setError('Nenhum documento encontrado para este CNPJ.');
+                 setError('Nenhum documento encontrado. Verifique se a tabela "cvm_documents" foi criada e populada pelo ETL.');
             }
-
-            const formattedDocs = data.map(doc => ({
-                id: doc.id.toString(),
-                date: formatDate(doc.reference_date),
-                company: doc.company_name,
-                category: doc.category,
-                subject: doc.subject,
-                link: doc.download_link,
-            }));
-            setDocuments(formattedDocs);
+            setDocuments(data);
 
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.');
@@ -74,7 +65,7 @@ const CvmDocuments: React.FC = () => {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-semibold text-white">Documentos CVM (IPE)</h2>
+                <h2 className="text-2xl font-semibold text-white">Documentos da CVM (IPE)</h2>
             </div>
 
             <form onSubmit={handleSearch} className="flex items-center gap-2">
@@ -104,7 +95,7 @@ const CvmDocuments: React.FC = () => {
             )}
             
             <div className="bg-slate-800/50 rounded-lg border border-slate-700 overflow-hidden">
-                <div className="overflow-x-a">
+                <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-slate-300">
                         <thead className="bg-slate-700/50 text-xs text-slate-400 uppercase">
                             <tr>
@@ -126,13 +117,13 @@ const CvmDocuments: React.FC = () => {
                             ) : documents.length > 0 ? (
                                 documents.map((doc) => (
                                     <tr key={doc.id} className="border-b border-slate-700 hover:bg-slate-700/40">
-                                        <td className="px-6 py-4 whitespace-nowrap">{doc.date}</td>
-                                        <td className="px-6 py-4 font-medium text-white">{doc.company}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap">{formatDate(doc.reference_date)}</td>
+                                        <td className="px-6 py-4 font-medium text-white">{doc.company_name}</td>
                                         <td className="px-6 py-4">{doc.category}</td>
                                         <td className="px-6 py-4 max-w-sm truncate" title={doc.subject}>{doc.subject}</td>
                                         <td className="px-6 py-4 text-center">
                                             <a 
-                                                href={doc.link} 
+                                                href={doc.download_link} 
                                                 target="_blank" 
                                                 rel="noopener noreferrer" 
                                                 className="text-sky-400 hover:text-sky-300 transition-colors"

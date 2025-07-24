@@ -1,6 +1,6 @@
 # backend/routes/companies_routes.py
 from flask import Blueprint, jsonify
-from backend.models import Company, FinancialStatement, Filing # Importar Filing
+from backend.models import Company, FinancialStatement, CvmDocument # Importar CvmDocument
 import traceback
 
 companies_bp = Blueprint('companies_bp', __name__, url_prefix='/api')
@@ -66,19 +66,18 @@ def get_financial_statements(cnpj):
             "details": str(e)
         }), 500
 
-# ROTA CORRIGIDA: Endpoint para buscar os documentos da CVM (agora da tabela 'filings')
+# ROTA CORRIGIDA: Aponta para o modelo CvmDocument e a tabela cvm_documents
 @companies_bp.route('/companies/<string:cnpj>/documents', methods=['GET'])
 def get_cvm_documents(cnpj):
     """
-    Retorna os documentos IPE (Informações Periódicas Estruturadas) de uma empresa.
+    Retorna os documentos IPE (agora da tabela cvm_documents) de uma empresa.
     """
     try:
         company = Company.query.filter_by(cnpj=cnpj).first_or_404(
             description=f"Nenhuma empresa encontrada com o CNPJ: {cnpj}"
         )
         
-        # CORREÇÃO: Usa o modelo 'Filing' para consultar a tabela 'filings'
-        documents = Filing.query.filter_by(company_cnpj=cnpj).order_by(Filing.reference_date.desc()).all()
+        documents = CvmDocument.query.filter_by(company_cnpj=cnpj).order_by(CvmDocument.reference_date.desc()).all()
         
         if not documents:
             return jsonify([])

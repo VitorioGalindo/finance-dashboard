@@ -18,53 +18,68 @@ def get_db_engine_vm():
     dbname = os.getenv("DB_NAME", "postgres")
     if not all([user, password, host]):
         raise ValueError("Credenciais do banco não encontradas no arquivo .env")
-    # echo=False para não poluir o log com os comandos SQL
     return create_engine(f"postgresql+psycopg2://{user}:{password}@{host}/{dbname}?sslmode=require", echo=False)
 
 def process_and_load_chunk(df_chunk, connection):
-    """
-    Transforma um chunk e usa a conexão fornecida para carregá-lo no banco.
-    A transação é gerenciada pela função que chama esta.
-    """
     df_chunk.columns = [col.lower() for col in df_chunk.columns]
     
     date_columns = ['data_referencia', 'data_entrega']
     for col in date_columns:
         df_chunk[col] = pd.to_datetime(df_chunk[col], errors='coerce')
 
+    # Mapeamento para os nomes de coluna em inglês do novo modelo CvmDocument
     column_mapping = {
-        'cnpj_companhia': 'company_cnpj', 'nome_companhia': 'company_name', 'codigo_cvm': 'cvm_code',
-        'categoria': 'category', 'tipo': 'doc_type', 'especie': 'species',
-        'assunto': 'subject', 'data_referencia': 'reference_date', 'data_entrega': 'delivery_date',
-        'protocolo_entrega': 'delivery_protocol', 'link_download': 'download_link'
+        'cnpj_companhia': 'company_cnpj',
+        'nome_companhia': 'company_name',
+        'codigo_cvm': 'cvm_code',
+        'categoria': 'category',
+        'tipo': 'doc_type',
+        'especie': 'species',
+        'assunto': 'subject',
+        'data_referencia': 'reference_date',
+        'data_entrega': 'delivery_date',
+        'protocolo_entrega': 'delivery_protocol',
+        'link_download': 'download_link'
     }
     
     df_chunk = df_chunk.rename(columns=column_mapping)
     
+    # Garante que o CNPJ seja apenas números
+    if 'company_cnpj' in df_chunk.columns:
+        df_chunk['company_cnpj'] = df_chunk['company_cnpj'].str.replace(r'\D', '', regex=True)
+        
     final_columns = list(column_mapping.values())
-    df_chunk = df_chunk[[col for col in final_columns if col in df_chunk.columns]]
+    df_final = df_chunk[[col for col in final_columns if col in df_chunk.columns]]
 
-    df_chunk.to_sql(
-        'filings', 
+    df_final.to_sql(
+        'cvm_documents',  # CORREÇÃO: Aponta para a nova tabela correta
         connection, 
         if_exists='append', 
         index=False, 
-        chunksize=5000,
         method='multi'
     )
 
 def run_ipe_etl_pipeline():
-    print("--- INICIANDO PIPELINE ETL DE DOCUMENTOS IPE (ROBUSTO) ---")
+    print("--- INICIANDO PIPELINE ETL PARA 'cvm_documents' ---")
     engine = get_db_engine_vm()
     
-    print("Limpando a tabela 'filings' e dependências (CASCADE)...")
+    # TRUNCATE não funciona em tabelas que não existem. O ideal é deixar o SQLAlchemy criar.
+    # A lógica de criação da tabela está em `backend/app.py` (db.create_all()).
+    # Para garantir uma carga limpa, podemos tentar apagar e recriar.
+    print("Garantindo que a tabela 'cvm_documents' esteja limpa...")
     try:
         with engine.begin() as connection:
-            connection.execute(text("TRUNCATE TABLE filings RESTART IDENTITY CASCADE;"))
-        print("Tabela 'filings' limpa com sucesso.")
+            # Apaga a tabela se ela existir, junto com quaisquer dependências
+            connection.execute(text("DROP TABLE IF EXISTS cvm_documents CASCADE;"))
+            print("Tabela 'cvm_documents' antiga (se existiu) removida.")
+            # O SQLAlchemy irá recriar a tabela com o esquema correto na inicialização do app
     except SQLAlchemyError as e:
-        print(f"ERRO CRÍTICO ao limpar a tabela 'filings': {e}")
-        return # Aborta se não conseguir limpar a tabela
+        print(f"AVISO: Não foi possível apagar a tabela 'cvm_documents'. Pode ser a primeira execução. Erro: {e}")
+
+
+    print("Execute o aplicativo Flask principal (`backend/app.py`) em um terminal separado para criar a tabela 'cvm_documents' antes de prosseguir com a carga de dados.")
+    input("Pressione Enter quando o aplicativo Flask estiver em execução e a tabela tiver sido criada...")
+
 
     anos_para_buscar = range(2010, datetime.now().year + 1)
     
@@ -89,29 +104,27 @@ def run_ipe_etl_pipeline():
                                 
                                 header = next(reader)
                                 batch = []
-                                batch_size = 10000 # Reduzindo o lote para isolar melhor os erros
+                                batch_size = 10000
 
                                 for i, row in enumerate(reader):
                                     batch.append(row)
                                     if len(batch) >= batch_size:
-                                        # CORREÇÃO: Envolve cada lote em sua própria transação
                                         try:
                                             with engine.begin() as connection:
                                                 df_chunk = pd.DataFrame(batch, columns=header)
                                                 process_and_load_chunk(df_chunk, connection)
                                         except SQLAlchemyError as e:
-                                            print(f"     -> ERRO em lote de {len(batch)} linhas. Lote ignorado. Detalhes: {e}")
+                                            print(f"     -> ERRO em lote. Lote ignorado. Detalhes: {str(e)[:200]}...")
                                         finally:
-                                            batch = [] # Limpa o lote
+                                            batch = []
                                 
-                                # Processa o último lote restante
                                 if batch:
                                     try:
                                         with engine.begin() as connection:
                                             df_chunk = pd.DataFrame(batch, columns=header)
                                             process_and_load_chunk(df_chunk, connection)
                                     except SQLAlchemyError as e:
-                                        print(f"     -> ERRO no lote final de {len(batch)} linhas. Lote ignorado. Detalhes: {e}")
+                                        print(f"     -> ERRO no lote final. Lote ignorado. Detalhes: {str(e)[:200]}...")
                         except Exception as e:
                             print(f"     -> ERRO CRÍTICO ao processar o arquivo {file_info.filename}: {e}")
 
@@ -120,7 +133,7 @@ def run_ipe_etl_pipeline():
         except Exception as e:
             print(f"  -> ERRO DESCONHECIDO no processamento do ano {ano}: {e}")
 
-    print("--- CARGA COMPLETA DE DOCUMENTOS IPE CONCLUÍDA! ---")
+    print("--- CARGA COMPLETA PARA 'cvm_documents' CONCLUÍDA! ---")
 
 if __name__ == "__main__":
     run_ipe_etl_pipeline()

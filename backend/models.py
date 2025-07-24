@@ -15,7 +15,8 @@ class Company(db.Model):
     updated_at = db.Column(DateTime(timezone=True), onupdate=func.now())
 
     statements = relationship("FinancialStatement", back_populates="company", cascade="all, delete-orphan")
-    filings = relationship("Filing", back_populates="company", cascade="all, delete-orphan")
+    # CORREÇÃO: A relação agora aponta para o modelo CvmDocument correto
+    documents = relationship("CvmDocument", back_populates="company", cascade="all, delete-orphan")
 
     def to_dict(self):
         return {
@@ -67,8 +68,9 @@ class FinancialStatement(db.Model):
             'period': self.period
         }
 
-class Filing(db.Model):
-    __tablename__ = 'filings'
+# CORREÇÃO DEFINITIVA: Modelo que espelha a estrutura rica da tabela antiga, com nomes em inglês.
+class CvmDocument(db.Model):
+    __tablename__ = 'cvm_documents' # Nova tabela com nome padronizado
 
     id = db.Column(Integer, primary_key=True)
     company_cnpj = db.Column(String(20), ForeignKey('companies.cnpj'), nullable=False)
@@ -83,7 +85,7 @@ class Filing(db.Model):
     delivery_protocol = db.Column(String(50))
     download_link = db.Column(Text)
     
-    company = relationship("Company", back_populates="filings")
+    company = relationship("Company", back_populates="documents")
 
     def to_dict(self):
         return {

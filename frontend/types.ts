@@ -159,17 +159,8 @@ export interface RawFinancialStatement {
     period: string;
 }
 
-// CVM Documents (Filings) Page Types
-export interface FilingDisplay {
-  id: string;
-  date: string;
-  company: string;
-  category: string;
-  subject: string;
-  link: string;
-}
-
-export interface Filing {
+// CORREÇÃO: Interface alinhada com o modelo CvmDocument e a API
+export interface CvmDocumentData {
     id: number;
     company_cnpj: string;
     company_name: string;
