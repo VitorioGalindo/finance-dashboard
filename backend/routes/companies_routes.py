@@ -1,6 +1,6 @@
 # backend/routes/companies_routes.py
 from flask import Blueprint, jsonify
-from backend.models import Company, FinancialStatement, CvmDocument # Importar CvmDocument
+from backend.models import Company, CvmDocument # Remove FinancialStatement
 import traceback
 
 companies_bp = Blueprint('companies_bp', __name__, url_prefix='/api')
@@ -43,30 +43,11 @@ def get_company_by_cnpj(cnpj):
             "details": str(e)
         }), 500
 
-@companies_bp.route('/companies/<string:cnpj>/financials', methods=['GET'])
-def get_financial_statements(cnpj):
-    """
-    Retorna os demonstrativos financeiros de uma empresa específica.
-    """
-    try:
-        company = Company.query.filter_by(cnpj=cnpj).first_or_404(
-            description=f"Nenhuma empresa encontrada com o CNPJ: {cnpj}"
-        )
-        statements = FinancialStatement.query.filter_by(company_cnpj=cnpj).all()
-        if not statements:
-            return jsonify([])
-        return jsonify([statement.to_dict() for statement in statements])
-    except Exception as e:
-        print("="*80)
-        print(f"ERRO DETALHADO em get_financial_statements para CNPJ {cnpj}: {e}")
-        traceback.print_exc()
-        print("="*80)
-        return jsonify({
-            "error": f"Ocorreu um erro interno no servidor ao buscar os dados financeiros para o CNPJ {cnpj}.",
-            "details": str(e)
-        }), 500
+# Rota /financials removida, pois agora usamos /api/financials/overview/<ticker_symbol>
+# @companies_bp.route('/companies/<string:cnpj>/financials', methods=['GET'])
+# def get_financial_statements(cnpj):
+#     pass # Rota removida
 
-# ROTA CORRIGIDA: Aponta para o modelo CvmDocument e a tabela cvm_documents
 @companies_bp.route('/companies/<string:cnpj>/documents', methods=['GET'])
 def get_cvm_documents(cnpj):
     """
