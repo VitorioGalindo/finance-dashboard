@@ -49,11 +49,10 @@ def process_and_load_chunk(df_chunk, engine):
         df_chunk = df_chunk.rename(columns=column_mapping)
         
         final_columns = list(column_mapping.values())
-        # Garante que apenas as colunas mapeadas e existentes no chunk sejam selecionadas
         df_chunk = df_chunk[[col for col in final_columns if col in df_chunk.columns]]
 
         df_chunk.to_sql(
-            'filings', # CORREÇÃO: Aponta para a tabela 'filings'
+            'filings', 
             engine, 
             if_exists='append', 
             index=False, 
@@ -98,9 +97,9 @@ def run_ipe_etl_pipeline():
     print("--- INICIANDO PIPELINE ETL DE DOCUMENTOS IPE (ALVO: 'filings') ---")
     engine = get_db_engine_vm()
     
-    print("Limpando a tabela de destino 'filings'...")
+    print("Limpando a tabela de destino 'filings' e suas dependências (CASCADE)...")
     with engine.begin() as connection:
-        connection.execute(text("TRUNCATE TABLE filings RESTART IDENTITY;"))
+        connection.execute(text("TRUNCATE TABLE filings RESTART IDENTITY CASCADE;"))
     
     anos_para_buscar = range(2010, datetime.now().year + 1)
     
