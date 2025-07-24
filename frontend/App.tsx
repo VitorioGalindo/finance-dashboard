@@ -1,37 +1,34 @@
 import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
-// Temporariamente removidos os imports de outros componentes de página
-// import PortfolioDashboard from './components/PortfolioDashboard';
-// import AIAssistant from './components/AIAssistant';
-// ...
-import CompanyNews from './components/CompanyNews'; // Mantido apenas o import de CompanyNews
+import PortfolioDashboard from './components/PortfolioDashboard';
+// Importe outros componentes se precisar alternar para eles, mas mantenha o foco no teste
 import { Page } from './types';
 
 const App: React.FC = () => {
-  // Restaurado o estado activePage para iniciar em 'company-news'
-  const [activePage, setActivePage] = useState<Page>('company-news');
-  const [searchedTicker, setSearchedTicker] = useState('ITUB4'); // Default ticker
+  // Força a página inicial a ser 'portfolio' para o nosso teste
+  const [activePage, setActivePage] = useState<Page>('portfolio');
+  const [searchedTicker, setSearchedTicker] = useState('ITUB4');
 
   const handleSearch = (ticker: string) => {
     if (ticker) {
       setSearchedTicker(ticker.toUpperCase());
-      setActivePage('overview');
+      // Você pode querer que a busca leve para a página de overview no futuro
+      // setActivePage('overview'); 
     }
   };
 
   const renderContent = () => {
     switch (activePage) {
-      case 'company-news':
-        return <CompanyNews />;
-      // Temporariamente removidos os outros casos
-      // case 'portfolio': return <PortfolioDashboard />; ...
+      case 'portfolio':
+        return <PortfolioDashboard />;
+      // Outros casos podem ser adicionados aqui mais tarde
       default:
         return (
           <div className="flex items-center justify-center h-full">
             <div className="text-center p-8 bg-slate-800/50 rounded-lg border border-slate-700">
               <h2 className="text-2xl font-bold text-white mb-2">Página em Construção</h2>
-              <p className="text-slate-400">Esta funcionalidade estará disponível em breve.</p>
+              <p className="text-slate-400">Selecione uma página na barra lateral.</p>
             </div>
           </div>
         );
