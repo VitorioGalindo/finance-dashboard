@@ -24,6 +24,23 @@ class Company(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
+class Ticker(db.Model):
+    __tablename__ = 'tickers'
+
+    ticker = db.Column(String(10), primary_key=True)
+    company_cnpj = db.Column(String(14), ForeignKey('companies.cnpj'), nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = db.Column(DateTime(timezone=True), onupdate=func.now())
+
+    company = relationship("Company")
+
+    def to_dict(self):
+        return {
+            'ticker': self.ticker,
+            'company_cnpj': self.company_cnpj,
+            'is_active': self.is_active
+        }
 
 class FinancialStatement(db.Model):
     __tablename__ = 'cvm_dados_financeiros'
@@ -157,4 +174,21 @@ class PortfolioMetric(db.Model):
             'id': self.id,
             'metric_name': self.metric_name,
             'metric_value': self.metric_value,
+        }
+# Em backend/models.py, adicione esta classe ao final do arquivo
+
+class RealtimeQuote(db.Model):
+    __tablename__ = 'realtime_quotes'
+
+    ticker = db.Column(String(10), primary_key=True)
+    last_price = db.Column(Float)
+    previous_close = db.Column(Float)
+    updated_at = db.Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
+
+    def to_dict(self):
+        return {
+            'ticker': self.ticker,
+            'last_price': self.last_price,
+            'previous_close': self.previous_close,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

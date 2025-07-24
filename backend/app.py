@@ -34,6 +34,9 @@ def create_app(test_config=None):
     # Registra o novo blueprint de Portfólio
     from backend.routes.portfolio_routes import portfolio_bp
     app.register_blueprint(portfolio_bp)
+
+    from backend.routes.financials_routes import financials_bp
+    app.register_blueprint(financials_bp)
     
     with app.app_context():
         # Importa os modelos aqui para que o SQLAlchemy os reconheça
