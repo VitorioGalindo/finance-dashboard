@@ -2,7 +2,7 @@
 from . import db
 from sqlalchemy.sql import func
 from sqlalchemy import (
-    String, Integer, DateTime, Date, Numeric, Text, ForeignKey, Float
+    String, Integer, DateTime, Date, Numeric, Text, ForeignKey, Float, BigInteger, Boolean
 )
 from sqlalchemy.orm import relationship
 
@@ -16,6 +16,10 @@ class Company(db.Model):
 
     statements = relationship("FinancialStatement", back_populates="company", cascade="all, delete-orphan")
     documents = relationship("CvmDocument", back_populates="company", cascade="all, delete-orphan")
+    # Novas Relações para Insiders
+    insiders = relationship("Insider", back_populates="company", cascade="all, delete-orphan")
+    filings = relationship("Filing", back_populates="company", cascade="all, delete-orphan")
+
 
     def to_dict(self):
         return {
@@ -24,6 +28,7 @@ class Company(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
+
 class Ticker(db.Model):
     __tablename__ = 'tickers'
 
@@ -118,8 +123,6 @@ class CvmDocument(db.Model):
             'download_link': self.download_link
         }
 
-# --- NOVOS MODELOS DE PORTFÓLIO ---
-
 class PortfolioConfig(db.Model):
     __tablename__ = 'portfolio_config'
     
@@ -175,7 +178,6 @@ class PortfolioMetric(db.Model):
             'metric_name': self.metric_name,
             'metric_value': self.metric_value,
         }
-# Em backend/models.py, adicione esta classe ao final do arquivo
 
 class RealtimeQuote(db.Model):
     __tablename__ = 'realtime_quotes'
@@ -192,3 +194,51 @@ class RealtimeQuote(db.Model):
             'previous_close': self.previous_close,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+# --- NOVOS MODELOS PARA RADAR DE INSIDERS ---
+
+class Filing(db.Model):
+    __tablename__ = 'filings'
+
+    id = db.Column(BigInteger, primary_key=True)
+    company_cnpj = db.Column(String(14), ForeignKey('companies.cnpj'), nullable=False)
+    reference_date = db.Column(Date, nullable=False)
+    cvm_protocol = db.Column(String(50), nullable=False, unique=True)
+    pdf_url = db.Column(String)
+    processed_at = db.Column(DateTime(timezone=True), onupdate=func.now())
+    
+    company = relationship("Company", back_populates="filings")
+    transactions = relationship("Transaction", back_populates="filing", cascade="all, delete-orphan")
+
+
+class Insider(db.Model):
+    __tablename__ = 'insiders'
+
+    id = db.Column(BigInteger, primary_key=True)
+    company_cnpj = db.Column(String(14), ForeignKey('companies.cnpj'), nullable=False)
+    name = db.Column(String(255), nullable=False)
+    document = db.Column(String(14))
+    insider_type = db.Column(String(50), nullable=False)
+    created_at = db.Column(DateTime(timezone=True), server_default=func.now())
+    
+    company = relationship("Company", back_populates="insiders")
+    transactions = relationship("Transaction", back_populates="insider", cascade="all, delete-orphan")
+
+
+class Transaction(db.Model):
+    __tablename__ = 'transactions'
+
+    id = db.Column(BigInteger, primary_key=True)
+    filing_id = db.Column(BigInteger, ForeignKey('filings.id'), nullable=False)
+    insider_id = db.Column(BigInteger, ForeignKey('insiders.id'), nullable=False)
+    transaction_date = db.Column(Date, nullable=False)
+    asset_type = db.Column(String(100))
+    asset_class = db.Column(String(50))
+    operation_type = db.Column(String(100))
+    quantity = db.Column(BigInteger, nullable=False)
+    price = db.Column(Numeric(20, 6), nullable=True)
+    volume = db.Column(Numeric(20, 4), nullable=True)
+    intermediary = db.Column(String(255), nullable=True)
+
+    filing = relationship("Filing", back_populates="transactions")
+    insider = relationship("Insider", back_populates="transactions")
