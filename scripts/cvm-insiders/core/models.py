@@ -1,6 +1,6 @@
 # core/models.py
 from sqlalchemy import (Column, String, BigInteger, Date,
-                        ForeignKey, TIMESTAMP, NUMERIC, Boolean) # Adicionado Boolean se necessário
+                        ForeignKey, TIMESTAMP, NUMERIC, Boolean)
 from sqlalchemy.orm import relationship, declarative_base
 import datetime
 
@@ -34,7 +34,7 @@ class Filing(Base):
     company = relationship("Company")
 
 class Transaction(Base):
-    __tablename__ = 'transactions'
+    __tablename__ = 'insider_transactions' # <-- CORRIGIDO AQUI
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     filing_id = Column(BigInteger, ForeignKey('filings.id'), nullable=False)
     insider_id = Column(BigInteger, ForeignKey('insiders.id'), nullable=False)
@@ -43,9 +43,8 @@ class Transaction(Base):
     asset_class = Column(String(50))
     operation_type = Column(String(100))
     quantity = Column(BigInteger, nullable=False)
-    # --- CORREÇÃO AQUI: Permite que preço e volume sejam nulos ---
     price = Column(NUMERIC(20, 6), nullable=True)
     volume = Column(NUMERIC(20, 4), nullable=True)
-    intermediary = Column(String(255), nullable=True) # Também é bom permitir nulo aqui
+    intermediary = Column(String(255), nullable=True)
     filing = relationship("Filing")
     insider = relationship("Insider")
