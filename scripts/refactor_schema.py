@@ -1,4 +1,4 @@
-# scripts/refactor_schema.py (Versão Final e Corrigida)
+# scripts/refactor_schema.py (Versão 2 - Corrigida para usar a tabela original 'cvm_dados_financeiros')
 import os
 from dotenv import load_dotenv
 import psycopg2
@@ -31,50 +31,22 @@ def run_migration():
              """
              CREATE TABLE IF NOT EXISTS public.financial_reports (
                  id BIGSERIAL PRIMARY KEY,
-                 company_cnpj VARCHAR(14) NOT NULL REFERENCES public.companies(cnpj),
+                 company_cnpj VARCHAR(20) NOT NULL REFERENCES public.companies(cnpj),
                  year INTEGER NOT NULL,
                  period VARCHAR(20) NOT NULL,
                  report_type VARCHAR(50) NOT NULL,
                  UNIQUE (company_cnpj, year, period, report_type)
              );
              """),
-            ("Criando nova tabela 'company_financial_ratios'",
-             """
-             CREATE TABLE IF NOT EXISTS public.company_financial_ratios (
-                 id BIGSERIAL PRIMARY KEY,
-                 report_id BIGINT NOT NULL REFERENCES public.financial_reports(id),
-                 ratio_name VARCHAR(50) NOT NULL,
-                 ratio_value NUMERIC(20, 4) NOT NULL,
-                 UNIQUE (report_id, ratio_name)
-             );
-             """),
-            ("Criando nova tabela 'news_articles'",
-             """
-             CREATE TABLE IF NOT EXISTS public.news_articles (
-                 id BIGSERIAL PRIMARY KEY,
-                 source VARCHAR(100),
-                 published_at TIMESTAMP WITH TIME ZONE,
-                 url VARCHAR(512) UNIQUE,
-                 title TEXT,
-                 summary TEXT
-             );
-             """),
-            ("Criando nova tabela de ligação 'news_company_link'",
-             """
-             CREATE TABLE IF NOT EXISTS public.news_company_link (
-                 news_id BIGINT NOT NULL REFERENCES public.news_articles(id) ON DELETE CASCADE,
-                 company_cnpj VARCHAR(14) NOT NULL REFERENCES public.companies(cnpj) ON DELETE CASCADE,
-                 PRIMARY KEY (news_id, company_cnpj)
-             );
-             """),
+            # ... (outras criações de tabela, que já funcionaram)
         ],
         "3_refactor_financial_statements": [
-            ("Renomeando tabela 'financial_statements' para 'old_financial_statements'",
-             "ALTER TABLE IF EXISTS public.financial_statements RENAME TO old_financial_statements;"),
+            ("Renomeando tabela 'cvm_dados_financeiros' para 'old_financial_statements'",
+             "ALTER TABLE IF EXISTS public.cvm_dados_financeiros RENAME TO old_financial_statements;"), # CORREÇÃO AQUI
             
             ("Criando a nova tabela 'financial_statements' estruturada",
              """
-             CREATE TABLE public.financial_statements (
+             CREATE TABLE IF NOT EXISTS public.financial_statements (
                  id BIGSERIAL PRIMARY KEY,
                  report_id BIGINT NOT NULL REFERENCES public.financial_reports(id) ON DELETE CASCADE,
                  statement_type VARCHAR(50) NOT NULL,
@@ -89,12 +61,12 @@ def run_migration():
              """
              INSERT INTO public.financial_reports (company_cnpj, year, period, report_type)
              SELECT DISTINCT
-                 company_cnpj,
-                 EXTRACT(YEAR FROM fiscal_year_end)::INTEGER,
-                 periodo,
-                 report_type
+                 cnpj_cia, -- CORREÇÃO: Usando nome da coluna original
+                 EXTRACT(YEAR FROM dt_fim_exerc)::INTEGER, -- CORREÇÃO: Usando nome da coluna original
+                 periodo, -- CORREÇÃO: Usando nome da coluna original
+                 tipo_demonstracao -- CORREÇÃO: Usando nome da coluna original
              FROM public.old_financial_statements
-             WHERE company_cnpj IS NOT NULL AND fiscal_year_end IS NOT NULL AND periodo IS NOT NULL AND report_type IS NOT NULL
+             WHERE cnpj_cia IS NOT NULL AND dt_fim_exerc IS NOT NULL AND periodo IS NOT NULL AND tipo_demonstracao IS NOT NULL
              ON CONFLICT (company_cnpj, year, period, report_type) DO NOTHING;
              """),
             
@@ -103,16 +75,16 @@ def run_migration():
              INSERT INTO public.financial_statements (report_id, statement_type, account_code, account_description, account_value)
              SELECT
                  fr.id,
-                 ofs.report_type,
-                 ofs.account_code,
-                 ofs.account_description,
-                 ofs.account_value
+                 ofs.tipo_demonstracao, -- CORREÇÃO: Usando nome da coluna original
+                 ofs.cd_conta, -- CORREÇÃO: Usando nome da coluna original
+                 ofs.ds_conta, -- CORREÇÃO: Usando nome da coluna original
+                 ofs.vl_conta -- CORREÇÃO: Usando nome da coluna original
              FROM public.old_financial_statements AS ofs
              JOIN public.financial_reports AS fr
-                 ON ofs.company_cnpj = fr.company_cnpj
-                 AND EXTRACT(YEAR FROM ofs.fiscal_year_end)::INTEGER = fr.year
+                 ON ofs.cnpj_cia = fr.company_cnpj
+                 AND EXTRACT(YEAR FROM ofs.dt_fim_exerc)::INTEGER = fr.year
                  AND ofs.periodo = fr.period
-                 AND ofs.report_type = fr.report_type;
+                 AND ofs.tipo_demonstracao = fr.report_type;
              """),
         ],
         "5_cleanup": [
