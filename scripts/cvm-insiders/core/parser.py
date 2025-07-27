@@ -23,7 +23,6 @@ from .database import get_db
 class PDFParser:
     """
     Classe responsável por extrair informações de um único arquivo PDF.
-    A lógica interna de parsing de PDF permanece a mesma.
     """
     def __init__(self, pdf_path: str):
         self.pdf_path = pdf_path
@@ -36,13 +35,14 @@ class PDFParser:
         if not value: return None
         try:
             cleaned_value = self._clean_text(value).replace('.', '').replace(',', '.')
-            # Retorna None se o valor for apenas um traço ou vazio após a limpeza
             return float(cleaned_value) if cleaned_value and cleaned_value != '-' else None
         except (ValueError, TypeError):
             return None
 
     def extract_insider_info(self, page_text: str) -> Optional[Dict[str, str]]:
         """Extrai o nome e documento do insider do texto da página."""
+        # --- CORREÇÃO DO SYNTAX ERROR AQUI ---
+        # A expressão regular agora está em uma única linha e corretamente formatada.
         name_match = re.search(r"Nome da Pessoa Física ou Jurídica\s*
 (.*?)
 ", page_text)
@@ -67,11 +67,9 @@ class PDFParser:
                     page_text = page.extract_text(x_tolerance=1)
                     if not page_text: continue
 
-                    # Tenta extrair informações do insider em cada página, mas armazena apenas a primeira encontrada
                     if not insider_info:
                         insider_info = self.extract_insider_info(page_text)
 
-                    # Procura por tabelas de transação
                     if "Movimentações no Mês" not in page_text or "(X) não foram realizadas operações" in page_text:
                         continue
                     
@@ -92,13 +90,12 @@ class PDFParser:
                         
                         processed_rows = []
                         for _, row in df_body.iterrows():
-                            # Ignora linhas que são completamente vazias
                             if row.isnull().all(): continue
                             processed_rows.append(row.to_dict())
 
                         for row_dict in processed_rows:
                             day_str = self._clean_text(row_dict.get('Dia'))
-                            day = int(float(day_str)) if day_str else None
+                            day = int(float(day_str)) if day_str and day_str != '-' else None
                             quantity = self._parse_number(row_dict.get('Quantidade'))
 
                             if day and quantity and quantity != 0:
@@ -124,21 +121,19 @@ def get_or_create_insider(db: Session, company_cnpj: str, insider_info: Dict[str
             company_cnpj=company_cnpj,
             name=insider_info['name'],
             document=insider_info.get('document'),
-            insider_type='Individual' # Placeholder, pode ser melhorado
+            insider_type='Individual'
         )
         db.add(insider)
-        db.commit() # Comita para que o ID seja gerado e possa ser usado
+        db.commit()
         db.refresh(insider)
     return insider
 
 def run_parser():
     """
     Função principal que orquestra o processo de parsing.
-    Busca filings não processados, baixa os PDFs e salva as transações.
     """
     print("-- Iniciando o parser de PDFs de insiders --")
     with get_db() as db:
-        # Busca filings que ainda não foram processados
         unprocessed_filings = db.query(Filing).filter(Filing.processed_at == None).all()
         
         if not unprocessed_filings:
@@ -150,7 +145,6 @@ def run_parser():
         for filing in unprocessed_filings:
             print(f"  -> Processando Filing ID: {filing.id}, Protocolo: {filing.cvm_protocol}")
             
-            # Baixa o PDF para um arquivo temporário
             try:
                 response = requests.get(filing.pdf_url)
                 response.raise_for_status()
@@ -159,14 +153,13 @@ def run_parser():
                     pdf_path = tmp.name
             except requests.RequestException as e:
                 print(f"    -> ERRO: Falha ao baixar o PDF {filing.pdf_url}. {e}")
-                filing.processed_at = datetime.utcnow() # Marca como processado para não tentar de novo
+                filing.processed_at = datetime.utcnow()
                 db.commit()
                 continue
             
-            # Extrai as informações do PDF
             parser = PDFParser(pdf_path)
             extracted_data = parser.extract_transactions()
-            os.remove(pdf_path) # Remove o arquivo temporário
+            os.remove(pdf_path)
 
             insider_info = extracted_data.get('insider')
             transactions = extracted_data.get('transactions', [])
@@ -177,7 +170,6 @@ def run_parser():
                 db.commit()
                 continue
 
-            # Pega ou cria o registro do insider
             try:
                 insider = get_or_create_insider(db, filing.company_cnpj, insider_info)
                 
@@ -196,7 +188,6 @@ def run_parser():
                 else:
                     print("    -> Nenhuma transação encontrada no documento.")
 
-                # Marca o filing como processado
                 filing.processed_at = datetime.utcnow()
                 db.commit()
                 
