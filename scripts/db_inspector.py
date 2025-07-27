@@ -26,21 +26,18 @@ def inspect_database():
         inspector = inspect(engine)
         schemas = inspector.get_schema_names()
 
-        print(f"
-Esquemas encontrados: {schemas}")
+        print(f"Esquemas encontrados: {schemas}")
 
         for schema in schemas:
             if schema in ['information_schema', 'pg_catalog', 'pg_toast']:
                 continue # Pula esquemas internos do PostgreSQL
 
-            print(f"
-{'='*20} ESQUEMA: {schema.upper()} {'='*20}")
+            print(f"{'='*20} ESQUEMA: {schema.upper()} {'='*20}")
             tables = inspector.get_table_names(schema=schema)
             print(f"Tabelas encontradas: {tables}")
 
             for table_name in tables:
-                print(f"
---- Tabela: {schema}.{table_name} ---")
+                print(f"--- Tabela: {schema}.{table_name} ---")
                 
                 # Imprime informações das colunas
                 print("Estrutura das Colunas:")
@@ -85,10 +82,7 @@ Esquemas encontrados: {schemas}")
         print(f"
 Ocorreu um erro durante a inspeção: {e}")
     finally:
-        print(f"
-{'='*50}
---- SCRIPT DE INSPEÇÃO CONCLUÍDO ---
-{'='*50}")
+        print(f"{'='*50}--- SCRIPT DE INSPEÇÃO CONCLUÍDO ---{'='*50}")
 
 if __name__ == "__main__":
     inspect_database()
