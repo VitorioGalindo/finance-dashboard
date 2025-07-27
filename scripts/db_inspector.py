@@ -1,4 +1,4 @@
-# scripts/db_inspector.py (Versão Robusta)
+# scripts/db_inspector.py (Versão Corrigida)
 import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, inspect, text
@@ -19,13 +19,12 @@ def get_db_connection_string():
 
 def inspect_database():
     """Conecta ao banco de dados e imprime sua estrutura detalhada."""
-    print("--- INICIANDO SCRIPT DE INSPEÇÃO DO BANCO DE DADOS (VERSÃO ROBUSTA) ---")
+    print("--- INICIANDO SCRIPT DE INSPEÇÃO DO BANCO DE DADOS (VERSÃO CORRIGIDA) ---")
     
     try:
         engine = create_engine(get_db_connection_string())
         inspector = inspect(engine)
         
-        # Informações gerais do dialeto e versão do DB
         with engine.connect() as connection:
             print(f"Dialeto do Banco: {connection.dialect.name}")
             server_version = connection.execute(text("SELECT version();")).scalar()
@@ -35,7 +34,6 @@ def inspect_database():
         print(f"Esquemas encontrados: {schemas}")
 
         for schema in schemas:
-            # Pula esquemas internos do PostgreSQL para manter o foco
             if schema.startswith('pg_') or schema == 'information_schema':
                 continue
 
@@ -47,24 +45,23 @@ def inspect_database():
                 print(f"--- Tabela: {schema}.{table_name} ---")
                 
                 try:
-                    # Chaves Primárias
                     pk_constraint = inspector.get_pk_constraint(table_name, schema=schema)
                     pk_columns = pk_constraint.get('constrained_columns', [])
                     print(f"  Chave Primária: {pk_columns if pk_columns else 'N/A'}")
 
-                    # Estrutura das Colunas
                     print("  Estrutura das Colunas:")
                     columns = inspector.get_columns(table_name, schema=schema)
                     for column in columns:
+                        # CORREÇÃO: Converte o tipo da coluna para string antes de formatar
+                        column_type_str = str(column['type'])
                         col_info = (
                             f"    - Nome: {column['name']:<25} | "
-                            f"Tipo: {column['type']:<20} | "
+                            f"Tipo: {column_type_str:<20} | "
                             f"Nulável: {column['nullable']:<5} | "
                             f"Default: {column['default']}"
                         )
                         print(col_info)
                     
-                    # Chaves Estrangeiras
                     foreign_keys = inspector.get_foreign_keys(table_name, schema=schema)
                     if foreign_keys:
                         print("  Chaves Estrangeiras:")
@@ -82,7 +79,7 @@ def inspect_database():
 
     except Exception as e:
         print(f"Ocorreu um erro fatal durante a inspeção: {e}", file=sys.stderr)
-        sys.exit(1) # Sai com código de erro para ser capturado por outros scripts
+        sys.exit(1)
     finally:
         print(f"{'='*70}--- SCRIPT DE INSPEÇÃO CONCLUÍDO ---{'='*70}")
 
