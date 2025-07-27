@@ -22,16 +22,13 @@ def main():
     # Esta etapa garante que a tabela 'filings' esteja atualizada.
     fetch_and_save_filings()
     
-    print("
-" + "="*50 + "
-")
+    print("" + "="*50 + "")
     
     # Etapa 2: Processar os filings que ainda não foram analisados.
     # Esta etapa lê a tabela 'filings', baixa os PDFs e extrai as transações.
     run_parser()
     
-    print("
---- PIPELINE COMPLETO DE DADOS DE INSIDERS CONCLUÍDO ---")
+    print("--- PIPELINE COMPLETO DE DADOS DE INSIDERS CONCLUÍDO ---")
 
 if __name__ == "__main__":
     main()
