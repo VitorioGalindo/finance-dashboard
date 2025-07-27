@@ -1,8 +1,7 @@
-# scripts/refactor_schema.py
+# scripts/refactor_schema.py (Versão Final e Corrigida)
 import os
 from dotenv import load_dotenv
 import psycopg2
-from psycopg2 import sql
 
 def get_db_connection_string():
     """Lê as credenciais do .env e cria uma string de conexão."""
@@ -23,10 +22,9 @@ def run_migration():
     conn_str = get_db_connection_string()
     conn = None
     
-    # Comandos são separados em blocos lógicos
     commands = {
         "1_prepare_environment": [
-            ("Desabilitando triggers (se houver) para performance", "SET session_replication_role = 'replica';"),
+            ("Desabilitando triggers", "SET session_replication_role = 'replica';"),
         ],
         "2_create_new_tables": [
             ("Criando nova tabela 'financial_reports'",
@@ -36,7 +34,7 @@ def run_migration():
                  company_cnpj VARCHAR(14) NOT NULL REFERENCES public.companies(cnpj),
                  year INTEGER NOT NULL,
                  period VARCHAR(20) NOT NULL,
-                 report_type VARCHAR(10) NOT NULL,
+                 report_type VARCHAR(50) NOT NULL,
                  UNIQUE (company_cnpj, year, period, report_type)
              );
              """),
@@ -79,7 +77,7 @@ def run_migration():
              CREATE TABLE public.financial_statements (
                  id BIGSERIAL PRIMARY KEY,
                  report_id BIGINT NOT NULL REFERENCES public.financial_reports(id) ON DELETE CASCADE,
-                 statement_type VARCHAR(10) NOT NULL, -- DRE, BPA, BPP, DFC
+                 statement_type VARCHAR(50) NOT NULL,
                  account_code VARCHAR(30) NOT NULL,
                  account_description TEXT,
                  account_value NUMERIC(20, 2) NOT NULL
@@ -94,12 +92,9 @@ def run_migration():
                  company_cnpj,
                  EXTRACT(YEAR FROM fiscal_year_end)::INTEGER,
                  periodo,
-                 CASE 
-                     WHEN report_type IN ('BPA', 'BPP', 'DFC', 'DRE') THEN 'DFP' -- Simplificação, pode ser ajustado
-                     ELSE report_type
-                 END
+                 report_type
              FROM public.old_financial_statements
-             WHERE company_cnpj IS NOT NULL AND fiscal_year_end IS NOT NULL AND periodo IS NOT NULL
+             WHERE company_cnpj IS NOT NULL AND fiscal_year_end IS NOT NULL AND periodo IS NOT NULL AND report_type IS NOT NULL
              ON CONFLICT (company_cnpj, year, period, report_type) DO NOTHING;
              """),
             
@@ -116,7 +111,8 @@ def run_migration():
              JOIN public.financial_reports AS fr
                  ON ofs.company_cnpj = fr.company_cnpj
                  AND EXTRACT(YEAR FROM ofs.fiscal_year_end)::INTEGER = fr.year
-                 AND ofs.periodo = fr.period;
+                 AND ofs.periodo = fr.period
+                 AND ofs.report_type = fr.report_type;
              """),
         ],
         "5_cleanup": [
@@ -139,14 +135,14 @@ def run_migration():
                         print(" OK")
                     except Exception as e:
                         print(f" FALHOU: {e.pgcode if hasattr(e, 'pgcode') else ''} {e.pgerror if hasattr(e, 'pgerror') else str(e).strip()}")
-                        conn.rollback() # Desfaz a transação atual
-                        raise e # Para a execução no primeiro erro
+                        conn.rollback()
+                        raise e
 
         conn.commit()
         print("🎉 Migração de esquema concluída com sucesso!")
 
     except Exception as e:
-        print(f"❌ ERRO FATAL DURANTE A MIGRAÇÃO. O processo foi interrompido.")
+        print("❌ ERRO FATAL DURANTE A MIGRAÇÃO. O processo foi interrompido.")
     finally:
         if conn:
             conn.close()
