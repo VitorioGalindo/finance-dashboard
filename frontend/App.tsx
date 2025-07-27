@@ -2,19 +2,31 @@ import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import PortfolioDashboard from './components/PortfolioDashboard';
-// Importe outros componentes se precisar alternar para eles, mas mantenha o foco no teste
+import AIAssistant from './components/AIAssistant';
+import MarketNews from './components/MarketNews';
+import YieldCurve from './components/YieldCurve';
+import InsiderRadar from './components/InsiderRadar';
+import MacroData from './components/MacroData';
+import Fundamentalist from './components/Fundamentalist';
+import CompanyOverview from './components/CompanyOverview';
+import HistoricalData from './components/HistoricalData';
+import CvmDocuments from './components/CvmDocuments';
+import MarketOverview from './components/MarketOverview';
+import Screening from './components/Screening';
+import FlowData from './components/FlowData';
+import SellSideData from './components/SellSideData';
+import Research from './components/Research';
+import CompanyNews from './components/CompanyNews';
 import { Page } from './types';
 
 const App: React.FC = () => {
-  // Força a página inicial a ser 'portfolio' para o nosso teste
-  const [activePage, setActivePage] = useState<Page>('portfolio');
-  const [searchedTicker, setSearchedTicker] = useState('ITUB4');
+  const [activePage, setActivePage] = useState<Page>('company-news');
+  const [searchedTicker, setSearchedTicker] = useState('ITUB4'); // Default ticker
 
   const handleSearch = (ticker: string) => {
     if (ticker) {
       setSearchedTicker(ticker.toUpperCase());
-      // Você pode querer que a busca leve para a página de overview no futuro
-      // setActivePage('overview'); 
+      setActivePage('overview');
     }
   };
 
@@ -22,13 +34,42 @@ const App: React.FC = () => {
     switch (activePage) {
       case 'portfolio':
         return <PortfolioDashboard />;
-      // Outros casos podem ser adicionados aqui mais tarde
+      case 'ai-assistant':
+        return <AIAssistant />;
+      case 'overview':
+        return <CompanyOverview ticker={searchedTicker} />;
+      case 'history':
+        return <HistoricalData ticker="PRIO3" />;
+      case 'market-data':
+        return <MarketNews />;
+      case 'yield-curve':
+        return <YieldCurve />;
+      case 'insider-radar':
+        return <InsiderRadar />;
+      case 'macro-data':
+        return <MacroData />;
+      case 'fundamentalist':
+        return <Fundamentalist />;
+      case 'cvm-docs':
+        return <CvmDocuments />;
+      case 'market-overview':
+        return <MarketOverview />;
+      case 'screening':
+        return <Screening />;
+      case 'flow-data':
+        return <FlowData />;
+      case 'sell-side-data':
+        return <SellSideData />;
+      case 'research':
+        return <Research />;
+      case 'company-news':
+        return <CompanyNews />;
       default:
         return (
           <div className="flex items-center justify-center h-full">
             <div className="text-center p-8 bg-slate-800/50 rounded-lg border border-slate-700">
               <h2 className="text-2xl font-bold text-white mb-2">Página em Construção</h2>
-              <p className="text-slate-400">Selecione uma página na barra lateral.</p>
+              <p className="text-slate-400">Esta funcionalidade estará disponível em breve.</p>
             </div>
           </div>
         );

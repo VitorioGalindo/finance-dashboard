@@ -1,50 +1,58 @@
-// frontend/services/geminiService.ts
+import { GoogleGenAI } from "@google/genai";
+import { CompanyNewsItem } from '../types';
 
-import { Message } from '../types';
+const API_KEY = process.env.API_KEY;
 
-// A URL base da nossa API Flask.
-// Em um ambiente de produção, isso viria de uma variável de ambiente.
-const API_BASE_URL = 'http://127.0.0.1:5000';
+if (!API_KEY) {
+    throw new Error("API_KEY environment variable not set.");
+}
 
-/**
- * Envia um prompt e o histórico da conversa para o backend e obtém a resposta do 'Apex Analyst'.
- *
- * @param prompt - A nova mensagem do usuário.
- * @param history - Uma lista de mensagens anteriores na conversa.
- * @returns Uma string contendo a resposta do assistente de IA.
- * @throws Lança um erro se a resposta da rede não for bem-sucedida.
- */
-const getAIAssistantResponse = async (prompt: string, history: Message[]): Promise<string> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/ai/analyst`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        prompt: prompt,
-        history: history,
-      }),
-    });
+const ai = new GoogleGenAI({ apiKey: API_KEY });
+const model = 'gemini-2.5-flash';
 
-    if (!response.ok) {
-      // Tenta ler a mensagem de erro do backend, se houver
-      const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.description || `Erro do servidor: ${response.status}`;
-      console.error('Falha ao obter resposta da API:', errorMessage);
-      throw new Error(errorMessage);
+const streamFinancialAnalysis = async function* (prompt: string, systemInstruction: string) {
+    try {
+        const result = await ai.models.generateContentStream({
+            model: model,
+            contents: prompt,
+            config: {
+                systemInstruction: systemInstruction,
+            },
+        });
+
+        for await (const chunk of result) {
+            if(chunk.text) {
+               yield chunk.text;
+            }
+        }
+    } catch (error) {
+        console.error("Error in Gemini stream:", error);
+        yield "Ocorreu um erro ao comunicar com a IA. Por favor, tente novamente.";
     }
-
-    const data = await response.json();
-    return data.content;
-
-  } catch (error) {
-    console.error('Erro de comunicação com o backend:', error);
-    // Propaga um erro mais amigável para a UI
-    throw new Error('Não foi possível conectar ao serviço de IA. Verifique sua conexão e tente novamente.');
-  }
 };
 
+const summarizeNewsFromUrl = async (url: string): Promise<Omit<CompanyNewsItem, 'id' | 'url'>> => {
+    console.log(`Simulating Gemini analysis for URL: ${url}`);
+    
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // In a real application, you would make a call to your backend,
+    // which then calls the Gemini API with the content of the URL.
+    // Here, we return mock data based on a fictional URL.
+    
+    const mockData = {
+        title: "Microsoft Earnings: Good Quarter From Any Angle",
+        summary: "A Microsoft divulgou um trimestre sólido, superando as expectativas em todas as frentes. O crescimento da receita de nuvem (Azure) continua a ser o principal impulsionador, com um aumento de 29% em relação ao ano anterior. A empresa também viu força em seus segmentos de produtividade e computação pessoal.",
+        source: "Morningstar",
+        publishedDate: new Date().toISOString(),
+    };
+    
+    return mockData;
+};
+
+
 export const geminiService = {
-  getAIAssistantResponse,
+    streamFinancialAnalysis,
+    summarizeNewsFromUrl,
 };

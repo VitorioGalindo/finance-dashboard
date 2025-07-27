@@ -1,4 +1,3 @@
-
 export type Page = 
   | 'portfolio' 
   | 'ai-assistant'
@@ -140,42 +139,6 @@ export interface FinancialStatementItem {
     changeType?: 'positive' | 'negative' | 'neutral';
 }
 
-export interface RawFinancialStatement {
-    id: number;
-    company_cnpj: string;
-    company_name: string;
-    cvm_code: string;
-    report_version: number;
-    reference_date: string;
-    fiscal_year_start: string;
-    fiscal_year_end: string;
-    account_code: string;
-    account_description: string;
-    account_value: number;
-    currency_scale: string;
-    currency: string;
-    fiscal_year_order: string;
-    report_type: string;
-    period: string;
-}
-
-// CORREÇÃO: Interface alinhada com o modelo CvmDocument e a API
-export interface CvmDocumentData {
-    id: number;
-    company_cnpj: string;
-    company_name: string;
-    cvm_code: string;
-    category: string;
-    doc_type: string;
-    species: string;
-    subject: string;
-    reference_date: string;
-    delivery_date: string;
-    delivery_protocol: string;
-    download_link: string;
-}
-
-
 export interface EditableAsset {
   id: number;
   ticker: string;
@@ -299,6 +262,15 @@ export interface AnalyticalSummaryItem {
     capital: number;
 }
 
+// CVM Documents Page Types
+export interface CvmDocument {
+  id: string;
+  date: string;
+  company: string;
+  category: string;
+  subject: string;
+  link: string;
+}
 
 // Market Overview Page Types
 export interface MarketPerformanceItem {

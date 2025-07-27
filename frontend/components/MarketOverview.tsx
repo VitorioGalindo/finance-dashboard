@@ -136,7 +136,7 @@ const MarketOverview: React.FC = () => {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
                         <div className="flex flex-col items-center">
-                           <p className="text-sm font-semibold text-slate-300 mb-2">Ativos {'>'} MM200 <InformationCircleIcon className="inline w-4 h-4 text-slate-500" /></p>
+                           <p className="text-sm font-semibold text-slate-300 mb-2">Ativos > MM200 <InformationCircleIcon className="inline w-4 h-4 text-slate-500" /></p>
                            <GaugeChart value={mockSentimentData[sentimentTab].value} />
                         </div>
                          <div>
