@@ -82,14 +82,12 @@ def run_migration():
                 # raise e # Descomente para parar no primeiro erro
         
         conn.commit()
-        print("
-Migrações executadas com sucesso!")
+        print("Migrações executadas com sucesso!")
 
     except Exception as e:
         if conn:
             conn.rollback()
-        print(f"
-Ocorreu um erro durante a migração: {e}")
+        print(f"Ocorreu um erro durante a migração: {e}")
     finally:
         if cur: cur.close()
         if conn: conn.close()
