@@ -1,4 +1,4 @@
-# main.py (VERSÃO OTIMIZADA COM SELEÇÃO DE ANO)
+# main.py (CORRIGIDO COM IMPORTAÇÕES RELATIVAS)
 import os
 import re
 import pandas as pd
@@ -7,18 +7,21 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 
-from core.database import engine, get_db
-from core.models import Base, Company, Insider, Filing, Transaction
-from core.data_portal import download_and_extract_dataframes
-from core.parser import PDFParser
-from core.config import settings
+# CORREÇÃO: Usa importações relativas explícitas
+from .core.database import engine, get_db
+from .core.models import Base, Company, Insider, Filing, Transaction
+from .core.data_portal import download_and_extract_dataframes
+from .core.parser import PDFParser
+from .core.config import settings
 
 def process_document(doc_metadata: pd.Series, df_consolidado: pd.DataFrame, db: Session):
+    # ... (o resto da função permanece o mesmo) ...
     protocol = str(doc_metadata['Protocolo_Entrega'])
     cnpj_cleaned = re.sub(r'\D', '', doc_metadata['CNPJ_Companhia'])
     company_name = doc_metadata['Nome_Companhia']
     
-    print(f"--- Processando protocolo: {protocol} para a empresa: {company_name} ---")
+    print(f"
+--- Processando protocolo: {protocol} para a empresa: {company_name} ---")
     if db.query(Filing).filter_by(cvm_protocol=protocol).first():
         print("Protocolo já processado. Pulando."); return
 
@@ -101,7 +104,8 @@ if __name__ == "__main__":
     end_year = datetime.now().year
 
     for year in range(start_year, end_year + 1):
-        print(f"{'='*20} PROCESSANDO ANO: {year} {'='*20}")
+        print(f"
+{'='*20} PROCESSANDO ANO: {year} {'='*20}")
         df_main, df_consolidado = download_and_extract_dataframes(year=year)
         
         if df_main is not None and df_consolidado is not None and not df_main.empty and not df_consolidado.empty:
@@ -118,4 +122,5 @@ if __name__ == "__main__":
         else:
             print(f"Falha ao obter DataFrames para o ano {year}. Pulando.")
 
-    print("--- Pipeline de ETL de Insiders concluído. ---")
+    print("
+--- Pipeline de ETL de Insiders concluído. ---")
