@@ -79,8 +79,7 @@ def inspect_database():
                     print(f"  ERRO ao buscar amostra de dados para a tabela {table_name}: {e}")
 
     except Exception as e:
-        print(f"
-Ocorreu um erro durante a inspeção: {e}")
+        print(f"Ocorreu um erro durante a inspeção: {e}")
     finally:
         print(f"{'='*50}--- SCRIPT DE INSPEÇÃO CONCLUÍDO ---{'='*50}")
 
