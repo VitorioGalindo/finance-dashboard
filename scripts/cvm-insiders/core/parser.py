@@ -43,12 +43,8 @@ class PDFParser:
         """Extrai o nome e documento do insider do texto da página."""
         # --- CORREÇÃO DO SYNTAX ERROR AQUI ---
         # A expressão regular agora está em uma única linha e corretamente formatada.
-        name_match = re.search(r"Nome da Pessoa Física ou Jurídica\s*
-(.*?)
-", page_text)
-        doc_match = re.search(r"CPF/CNPJ\s*
-(.*?)
-", page_text)
+        name_match = re.search(r"Nome da Pessoa Física ou Jurídica\s*(.*?)", page_text)
+        doc_match = re.search(r"CPF/CNPJ\s*(.*?)", page_text)
         
         if name_match:
             return {
