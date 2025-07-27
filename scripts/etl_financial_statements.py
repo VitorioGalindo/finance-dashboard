@@ -1,4 +1,4 @@
-# scripts/etl_financial_statements.py (Versão Final e Verificada)
+# scripts/etl_financial_statements.py (VERSÃO FINAL E CORRIGIDA PÓS-REATORAÇÃO)
 import os
 from dotenv import load_dotenv
 import psycopg2
@@ -28,7 +28,8 @@ def get_existing_companies(conn):
 
 def process_financial_data(year, report_type_abbr, period_name, existing_companies):
     """Busca e processa um ano de dados DFP ou ITR, apenas para empresas existentes."""
-    print(f"Buscando dados {period_name} para o ano: {year}...")
+    print(f"
+Buscando dados {period_name} para o ano: {year}...")
     
     conn_str = get_db_connection_string()
     conn = None
@@ -45,7 +46,6 @@ def process_financial_data(year, report_type_abbr, period_name, existing_compani
 
         zip_buffer = io.BytesIO(response.content)
         with zipfile.ZipFile(zip_buffer) as z:
-            # Lista de demonstrativos que queremos processar
             statements_to_process = ['DRE_con', 'BPA_con', 'BPP_con', 'DFC_MD_con', 'DFC_MI_con']
             
             for statement_file_suffix in statements_to_process:
@@ -55,11 +55,9 @@ def process_financial_data(year, report_type_abbr, period_name, existing_compani
                     total_rows = 0
                     
                     with z.open(file_name) as f:
-                        # Processa o CSV em chunks para otimizar o uso de memória
                         for chunk in pd.read_csv(f, sep=';', encoding='latin-1', dtype=str, chunksize=10000):
                             total_rows += len(chunk)
                             
-                            # LÓGICA DE TRANSFORMAÇÃO
                             chunk['CNPJ_CIA_cleaned'] = chunk['CNPJ_CIA'].str.replace(r'\D', '', regex=True)
                             chunk_filtered = chunk[chunk['CNPJ_CIA_cleaned'].isin(existing_companies)].copy()
                             
@@ -67,8 +65,6 @@ def process_financial_data(year, report_type_abbr, period_name, existing_compani
                                 continue
 
                             with conn.cursor() as cur:
-                                # LÓGICA DE CARGA (BULK INSERT)
-                                # Passo 1: Preparar e inserir os relatórios (financial_reports)
                                 reports_data = set()
                                 for _, row in chunk_filtered.iterrows():
                                     report_year = pd.to_datetime(row['DT_FIM_EXERC']).year
@@ -76,20 +72,19 @@ def process_financial_data(year, report_type_abbr, period_name, existing_compani
                                         row['CNPJ_CIA_cleaned'], report_year, period_name, report_type_abbr.upper()
                                     ))
                                 
-                                execute_values(cur,
-                                    """
-                                    INSERT INTO financial_reports (company_cnpj, year, period, report_type)
-                                    VALUES %s ON CONFLICT (company_cnpj, year, period, report_type) DO NOTHING;
-                                    """, list(reports_data))
+                                if reports_data:
+                                    execute_values(cur,
+                                        """
+                                        INSERT INTO financial_reports (company_cnpj, year, period, report_type)
+                                        VALUES %s ON CONFLICT (company_cnpj, year, period, report_type) DO NOTHING;
+                                        """, list(reports_data))
 
-                                # Passo 2: Buscar os IDs dos relatórios que acabamos de inserir/garantir que existem
                                 cur.execute(
                                     "SELECT id, company_cnpj, year, period, report_type FROM financial_reports WHERE company_cnpj = ANY(%s)",
                                     (list(chunk_filtered['CNPJ_CIA_cleaned'].unique()),)
                                 )
                                 report_map = { (r[1], r[2], r[3], r[4]): r[0] for r in cur.fetchall() }
 
-                                # Passo 3: Preparar e inserir as linhas dos demonstrativos (financial_statements)
                                 statements_to_insert = []
                                 for _, row in chunk_filtered.iterrows():
                                     report_year = pd.to_datetime(row['DT_FIM_EXERC']).year
@@ -138,4 +133,5 @@ if __name__ == "__main__":
     finally:
         if main_conn: main_conn.close()
 
-    print("--- CARGA DE DADOS FINANCEIROS CONCLUÍDA ---")
+    print("
+--- CARGA DE DADOS FINANCEIROS CONCLUÍDA ---")

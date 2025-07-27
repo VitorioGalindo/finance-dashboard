@@ -1,46 +1,49 @@
-# backend/routes/financials_routes.py (VERSÃO APRIMORADA COM FILTROS)
+# backend/routes/financials_routes.py (VERSÃO FINAL PÓS-REATORAÇÃO)
 from flask import Blueprint, jsonify, request
-from backend.models import FinancialStatement, Company
+from backend.models import FinancialReport, FinancialStatement, Company
+from sqlalchemy.orm import joinedload
 
 financials_bp = Blueprint('financials_bp', __name__)
 
 @financials_bp.route('/companies/<string:cnpj>/financials', methods=['GET'])
 def get_financials(cnpj):
     """
-    Retorna dados financeiros para uma empresa, com filtros opcionais.
-    Uso: /api/companies/<cnpj>/financials?report_type=DRE&period=ANUAL
+    Retorna os dados financeiros anuais (DFP) de uma empresa,
+    estruturados por ano para fácil consumo do frontend.
     """
-    # Verifica se a empresa existe
     company = Company.query.get(cnpj)
     if not company:
         return jsonify({"error": f"Empresa com CNPJ {cnpj} não encontrada"}), 404
         
     try:
-        # Pega os parâmetros da URL. Se não forem fornecidos, não são usados no filtro.
-        report_type = request.args.get('report_type', type=str)
-        period = request.args.get('period', type=str)
-
-        # Começa a construir a query
-        query = FinancialStatement.query.filter_by(company_cnpj=cnpj)
-
-        # Adiciona filtros à query se os parâmetros foram fornecidos
-        if report_type:
-            # O frontend pode pedir 'BPA' ou 'BPP' para o balanço.
-            # Se pedir 'BP' (Balanço Patrimonial), podemos retornar ambos.
-            if report_type.upper() == 'BP':
-                query = query.filter(FinancialStatement.report_type.in_(['BPA', 'BPP']))
-            else:
-                query = query.filter(FinancialStatement.report_type == report_type.upper())
+        # Busca todos os relatórios anuais da empresa e suas respectivas linhas (statements)
+        # O 'joinedload' otimiza a busca, fazendo um JOIN em vez de múltiplas queries.
+        reports = FinancialReport.query.options(
+            joinedload(FinancialReport.statements)
+        ).filter_by(
+            company_cnpj=cnpj,
+            period='ANUAL',
+            report_type='DFP'
+        ).order_by(FinancialReport.year).all()
         
-        if period:
-            query = query.filter(FinancialStatement.periodo == period.upper())
+        # Estrutura a resposta como um dicionário onde a chave é o ano
+        response_data = {}
+        for report in reports:
+            # Para cada ano, cria um dicionário para os tipos de demonstrativos (DRE, BPA, etc.)
+            response_data[report.year] = {
+                'DRE': [],
+                'BPA': [],
 
-        # Executa a query final
-        statements = query.all()
-        
-        statements_list = [stmt.to_dict() for stmt in statements]
+                'BPP': [],
+                'DFC_MD': [],
+                'DFC_MI': []
+            }
+            # Agrupa as linhas do relatório em seus respectivos demonstrativos
+            for statement in report.statements:
+                if statement.statement_type in response_data[report.year]:
+                    response_data[report.year][statement.statement_type].append(statement.to_dict())
 
-        return jsonify(statements_list)
+        return jsonify(response_data)
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
