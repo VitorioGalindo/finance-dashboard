@@ -23,38 +23,40 @@ class Company(db.Model):
         }
 
 class CvmDocument(db.Model):
-    __tablename__ = 'cvm_documents' # Nome correto da tabela
+    __tablename__ = 'cvm_documents'
 
-    # Mapeamento explícito das colunas
     id = db.Column(Integer, primary_key=True, autoincrement=True)
-    cnpj_companhia = db.Column(String(20), ForeignKey('companies.cnpj')) # CORREÇÃO APLICADA AQUI
-    nome_companhia = db.Column(Text)
-    codigo_cvm = db.Column(String(10))
-    categoria = db.Column(String(100))
-    tipo = db.Column(String(100))
-    especie = db.Column(String(100))
-    assunto = db.Column(Text)
-    data_referencia = db.Column(Date)
-    data_entrega = db.Column(Date)
-    protocolo_entrega = db.Column(String(30))
-    link_download = db.Column(Text)
+    # CORREÇÃO APLICADA AQUI: O nome da propriedade da classe agora é 'company_cnpj'
+    # e ele mapeia para a coluna 'cnpj_companhia' no banco de dados.
+    company_cnpj = db.Column('cnpj_companhia', String(20), ForeignKey('companies.cnpj'))
+    company_name = db.Column('nome_companhia', Text)
+    cvm_code = db.Column('codigo_cvm', String(10))
+    category = db.Column('categoria', String(100))
+    doc_type = db.Column('tipo', String(100))
+    species = db.Column('especie', String(100))
+    subject = db.Column('assunto', Text)
+    reference_date = db.Column('data_referencia', Date)
+    delivery_date = db.Column('data_entrega', Date)
+    delivery_protocol = db.Column('protocolo_entrega', String(30))
+    download_link = db.Column('link_download', Text)
     
     company = relationship("Company", back_populates="documents")
 
     def to_dict(self):
+        # O método to_dict continua usando os nomes das propriedades da classe
         return {
             'id': self.id,
-            'company_cnpj': self.cnpj_companhia,
-            'company_name': self.nome_companhia,
-            'cvm_code': self.codigo_cvm,
-            'category': self.categoria,
-            'doc_type': self.tipo,
-            'species': self.especie,
-            'subject': self.assunto,
-            'reference_date': self.data_referencia.isoformat() if self.data_referencia else None,
-            'delivery_date': self.data_entrega.isoformat() if self.data_entrega else None,
-            'delivery_protocol': self.protocolo_entrega,
-            'download_link': self.link_download
+            'company_cnpj': self.company_cnpj,
+            'company_name': self.company_name,
+            'cvm_code': self.cvm_code,
+            'category': self.category,
+            'doc_type': self.doc_type,
+            'species': self.species,
+            'subject': self.subject,
+            'reference_date': self.reference_date.isoformat() if self.reference_date else None,
+            'delivery_date': self.delivery_date.isoformat() if self.delivery_date else None,
+            'delivery_protocol': self.delivery_protocol,
+            'download_link': self.download_link
         }
 
 # ... (outros modelos, se houver)
