@@ -90,7 +90,7 @@ class FinancialStatement(db.Model):
         }
 
 class CvmDocument(db.Model):
-    __tablename__ = 'cvm_documentos_ipe'
+    __tablename__ = 'cvm_documents' # <-- CORRIGIDO AQUI
 
     id = db.Column(Integer, primary_key=True, autoincrement=True)
     cnpj_companhia = db.Column('cnpj_companhia', String(20), ForeignKey('companies.cnpj'))
