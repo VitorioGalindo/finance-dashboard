@@ -1,4 +1,4 @@
-# scripts/refactor_schema.py (Versão 2 - Corrigida para usar a tabela original 'cvm_dados_financeiros')
+# scripts/refactor_schema.py (VERSÃO FINAL - Baseada na inspeção do DB)
 import os
 from dotenv import load_dotenv
 import psycopg2
@@ -12,85 +12,84 @@ def get_db_connection_string():
     dbname = os.getenv("DB_NAME", "postgres")
     if not all([user, password, host, dbname]):
         raise ValueError("Credenciais do banco de dados não encontradas.")
-    
     return f"postgresql://{user}:{password}@{host}/{dbname}?sslmode=require"
 
 def run_migration():
-    """Executa os comandos SQL para refatorar o esquema do banco de dados."""
-    print("--- INICIANDO SCRIPT DE MIGRAÇÃO PARA O ESQUEMA ESTRUTURADO ---")
+    """Executa os comandos SQL para criar a arquitetura final e padronizada do banco de dados."""
+    print("--- INICIANDO SCRIPT FINAL DE REATORAÇÃO DE ESQUEMA ---")
     
     conn_str = get_db_connection_string()
     conn = None
     
     commands = {
-        "1_prepare_environment": [
-            ("Desabilitando triggers", "SET session_replication_role = 'replica';"),
-        ],
-        "2_create_new_tables": [
-            ("Criando nova tabela 'financial_reports'",
+        "1_cleanup_obsolete_tables": [
+            ("Limpando tabelas antigas ou não padronizadas (se existirem)",
              """
-             CREATE TABLE IF NOT EXISTS public.financial_reports (
+             DROP TABLE IF EXISTS public.old_financial_statements CASCADE;
+             DROP TABLE IF EXISTS public.generic_transactions CASCADE;
+             DROP TABLE IF EXISTS public.cvm_dados_financeiros CASCADE;
+             """),
+        ],
+        "2_standardize_existing_tables": [
+            ("Padronizando colunas da tabela 'portfolio_config'",
+             """
+             DO $$
+             BEGIN
+                IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='portfolio_config' AND column_name='quantidade') THEN
+                    ALTER TABLE public.portfolio_config RENAME COLUMN quantidade TO quantity;
+                END IF;
+                IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='portfolio_config' AND column_name='posicao_alvo') THEN
+                    ALTER TABLE public.portfolio_config RENAME COLUMN posicao_alvo TO target_weight;
+                END IF;
+             END $$;
+             """),
+            ("Padronizando colunas da tabela 'portfolio_history'",
+             """
+             DO $$
+             BEGIN
+                IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='portfolio_history' AND column_name='data') THEN
+                    ALTER TABLE public.portfolio_history RENAME COLUMN data TO event_date;
+                END IF;
+             END $$;
+             """),
+        ],
+        "3_create_structured_financial_tables": [
+            ("Recriando a tabela 'financial_reports' (garantindo limpeza)",
+             """
+             DROP TABLE IF EXISTS public.financial_reports CASCADE;
+             CREATE TABLE public.financial_reports (
                  id BIGSERIAL PRIMARY KEY,
                  company_cnpj VARCHAR(20) NOT NULL REFERENCES public.companies(cnpj),
                  year INTEGER NOT NULL,
-                 period VARCHAR(20) NOT NULL,
-                 report_type VARCHAR(50) NOT NULL,
+                 period VARCHAR(20) NOT NULL, -- Ex: 'ANUAL' ou 'TRIMESTRAL'
+                 report_type VARCHAR(50) NOT NULL, -- Ex: 'DFP' ou 'ITR'
                  UNIQUE (company_cnpj, year, period, report_type)
              );
              """),
-            # ... (outras criações de tabela, que já funcionaram)
-        ],
-        "3_refactor_financial_statements": [
-            ("Renomeando tabela 'cvm_dados_financeiros' para 'old_financial_statements'",
-             "ALTER TABLE IF EXISTS public.cvm_dados_financeiros RENAME TO old_financial_statements;"), # CORREÇÃO AQUI
-            
-            ("Criando a nova tabela 'financial_statements' estruturada",
+            ("Recriando a tabela 'financial_statements' (garantindo limpeza)",
              """
-             CREATE TABLE IF NOT EXISTS public.financial_statements (
+             DROP TABLE IF EXISTS public.financial_statements CASCADE;
+             CREATE TABLE public.financial_statements (
                  id BIGSERIAL PRIMARY KEY,
                  report_id BIGINT NOT NULL REFERENCES public.financial_reports(id) ON DELETE CASCADE,
-                 statement_type VARCHAR(50) NOT NULL,
+                 statement_type VARCHAR(50) NOT NULL, -- Ex: 'DRE', 'BPA', 'BPP', 'DFC'
                  account_code VARCHAR(30) NOT NULL,
                  account_description TEXT,
-                 account_value NUMERIC(20, 2) NOT NULL
+                 account_value NUMERIC(20, 2) NOT NULL,
+                 UNIQUE(report_id, statement_type, account_code)
              );
              """),
-        ],
-        "4_migrate_data": [
-            ("Migrando dados para 'financial_reports'",
+            ("Recriando a tabela 'company_financial_ratios' (garantindo limpeza)",
              """
-             INSERT INTO public.financial_reports (company_cnpj, year, period, report_type)
-             SELECT DISTINCT
-                 cnpj_cia, -- CORREÇÃO: Usando nome da coluna original
-                 EXTRACT(YEAR FROM dt_fim_exerc)::INTEGER, -- CORREÇÃO: Usando nome da coluna original
-                 periodo, -- CORREÇÃO: Usando nome da coluna original
-                 tipo_demonstracao -- CORREÇÃO: Usando nome da coluna original
-             FROM public.old_financial_statements
-             WHERE cnpj_cia IS NOT NULL AND dt_fim_exerc IS NOT NULL AND periodo IS NOT NULL AND tipo_demonstracao IS NOT NULL
-             ON CONFLICT (company_cnpj, year, period, report_type) DO NOTHING;
+             DROP TABLE IF EXISTS public.company_financial_ratios CASCADE;
+             CREATE TABLE public.company_financial_ratios (
+                 id BIGSERIAL PRIMARY KEY,
+                 report_id BIGINT NOT NULL REFERENCES public.financial_reports(id),
+                 ratio_name VARCHAR(50) NOT NULL,
+                 ratio_value NUMERIC(20, 4) NOT NULL,
+                 UNIQUE (report_id, ratio_name)
+             );
              """),
-            
-            ("Migrando dados para a nova 'financial_statements'",
-             """
-             INSERT INTO public.financial_statements (report_id, statement_type, account_code, account_description, account_value)
-             SELECT
-                 fr.id,
-                 ofs.tipo_demonstracao, -- CORREÇÃO: Usando nome da coluna original
-                 ofs.cd_conta, -- CORREÇÃO: Usando nome da coluna original
-                 ofs.ds_conta, -- CORREÇÃO: Usando nome da coluna original
-                 ofs.vl_conta -- CORREÇÃO: Usando nome da coluna original
-             FROM public.old_financial_statements AS ofs
-             JOIN public.financial_reports AS fr
-                 ON ofs.cnpj_cia = fr.company_cnpj
-                 AND EXTRACT(YEAR FROM ofs.dt_fim_exerc)::INTEGER = fr.year
-                 AND ofs.periodo = fr.period
-                 AND ofs.tipo_demonstracao = fr.report_type;
-             """),
-        ],
-        "5_cleanup": [
-            ("Removendo a tabela antiga 'old_financial_statements'",
-             "DROP TABLE IF EXISTS public.old_financial_statements;"),
-            ("Reabilitando triggers", "SET session_replication_role = 'origin';"),
         ]
     }
     
@@ -109,16 +108,15 @@ def run_migration():
                         print(f" FALHOU: {e.pgcode if hasattr(e, 'pgcode') else ''} {e.pgerror if hasattr(e, 'pgerror') else str(e).strip()}")
                         conn.rollback()
                         raise e
-
         conn.commit()
-        print("🎉 Migração de esquema concluída com sucesso!")
+        print("🎉 Refatoração de esquema concluída com sucesso!")
 
     except Exception as e:
-        print("❌ ERRO FATAL DURANTE A MIGRAÇÃO. O processo foi interrompido.")
+        print("❌ ERRO FATAL DURANTE A REATORAÇÃO. O processo foi interrompido.")
     finally:
         if conn:
             conn.close()
-        print("--- SCRIPT DE MIGRAÇÃO CONCLUÍDO ---")
+        print("--- SCRIPT DE REATORAÇÃO CONCLUÍDO ---")
 
 if __name__ == "__main__":
     run_migration()
