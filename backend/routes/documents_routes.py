@@ -1,8 +1,7 @@
-# backend/routes/documents_routes.py
+# backend/routes/documents_routes.py (CORRIGIDO)
 from flask import Blueprint, jsonify
 from backend.models import CvmDocument, Company
 
-# Cria um Blueprint para agrupar as rotas de documentos
 documents_bp = Blueprint('documents_bp', __name__)
 
 @documents_bp.route('/companies/<string:cnpj>/documents', methods=['GET'])
@@ -17,13 +16,16 @@ def get_documents_by_company(cnpj):
         return jsonify({"error": "Empresa não encontrada"}), 404
 
     try:
-        # Busca todos os documentos associados ao CNPJ, ordenados
-        documents = CvmDocument.query.filter_by(cnpj_companhia=cnpj).order_by(CvmDocument.data_entrega.desc()).all()
+        # CORREÇÃO: Usa 'company_cnpj' que é o nome da propriedade no modelo CvmDocument
+        documents = CvmDocument.query.filter_by(company_cnpj=cnpj).order_by(CvmDocument.delivery_date.desc()).all()
         
-        # Converte a lista de objetos CvmDocument para uma lista de dicionários
         documents_list = [doc.to_dict() for doc in documents]
         
         return jsonify(documents_list)
         
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Adiciona o erro original na resposta para melhor depuração
+        return jsonify({
+            "error": f"Ocorreu um erro interno no servidor ao buscar os documentos CVM para o CNPJ {cnpj}.",
+            "details": str(e)
+        }), 500
