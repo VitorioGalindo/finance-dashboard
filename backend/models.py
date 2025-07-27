@@ -1,4 +1,4 @@
-# backend/models.py (VERSÃO FINAL E COMPLETA)
+# backend/models.py (VERSÃO CORRIGIDA)
 from backend import db
 from sqlalchemy import (
     String, Integer, DateTime, Date, Numeric, Text, ForeignKey, Float, BigInteger, Boolean
@@ -61,7 +61,7 @@ class FinancialStatement(db.Model):
     account_description = db.Column(Text)
     account_value = db.Column(Numeric(20, 2))
     report_type = db.Column(String(50))
-    period = db.Column(String(20))
+    periodo = db.Column(String(20)) # <-- CORRIGIDO AQUI
 
     def to_dict(self):
         return {
@@ -72,5 +72,5 @@ class FinancialStatement(db.Model):
             'account_description': self.account_description,
             'account_value': float(self.account_value) if self.account_value is not None else None,
             'report_type': self.report_type,
-            'period': self.period
+            'period': self.periodo # <-- CORRIGIDO AQUI (a chave do JSON pode ser 'period' por consistência)
         }
