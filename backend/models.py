@@ -1,11 +1,9 @@
-# backend/models.py (VERSÃO FINAL CORRIGIDA COM BASE NA INSPEÇÃO)
+# backend/models.py (VERSÃO FINAL COM to_dict() RESTAURADO)
 from backend import db
 from sqlalchemy import (
     String, Integer, DateTime, Date, Numeric, Text, ForeignKey, Float, BigInteger, Boolean
 )
 from sqlalchemy.orm import relationship
-
-# --- MODELOS PRINCIPAIS ---
 
 class Company(db.Model):
     __tablename__ = 'companies'
@@ -13,6 +11,14 @@ class Company(db.Model):
     name = db.Column(String(255), nullable=False)
     created_at = db.Column(DateTime)
     updated_at = db.Column(DateTime)
+
+    def to_dict(self):
+        return {
+            'cnpj': self.cnpj,
+            'name': self.name,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
 
 class Ticker(db.Model):
     __tablename__ = 'tickers'
@@ -23,7 +29,15 @@ class Ticker(db.Model):
     created_at = db.Column(DateTime)
     updated_at = db.Column(DateTime)
 
-# --- MODELOS DE DADOS DA CVM ---
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ticker': self.ticker,
+            'company_cnpj': self.company_cnpj,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
 
 class CvmDocument(db.Model):
     __tablename__ = 'cvm_documents'
@@ -39,11 +53,29 @@ class CvmDocument(db.Model):
     delivery_date = db.Column(Date)
     delivery_protocol = db.Column(String(50))
     download_link = db.Column(Text)
+    
+    company = relationship("Company", backref=db.backref('documents', lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'company_cnpj': self.company_cnpj,
+            'company_name': self.company_name,
+            'cvm_code': self.cvm_code,
+            'category': self.category,
+            'doc_type': self.doc_type,
+            'species': self.species,
+            'subject': self.subject,
+            'reference_date': self.reference_date.isoformat() if self.reference_date else None,
+            'delivery_date': self.delivery_date.isoformat() if self.delivery_date else None,
+            'delivery_protocol': self.delivery_protocol,
+            'download_link': self.download_link,
+        }
 
 class FinancialStatement(db.Model):
     __tablename__ = 'cvm_dados_financeiros'
     id = db.Column(Integer, primary_key=True)
-    cnpj_cia = db.Column(String(20), ForeignKey('companies.cnpj')) # Nome correto: cnpj_cia
+    cnpj_cia = db.Column(String(20), ForeignKey('companies.cnpj'))
     denom_cia = db.Column(Text)
     cd_cvm = db.Column(String(10))
     versao = db.Column(Integer)
@@ -59,82 +91,23 @@ class FinancialStatement(db.Model):
     tipo_demonstracao = db.Column(String(50))
     periodo = db.Column(String(20))
 
-# --- MODELOS DE INSIDERS ---
-
-class Filing(db.Model):
-    __tablename__ = 'filings'
-    id = db.Column(BigInteger, primary_key=True)
-    company_cnpj = db.Column(String(14), ForeignKey('companies.cnpj'), nullable=False)
-    reference_date = db.Column(Date, nullable=False)
-    cvm_protocol = db.Column(String(50), nullable=False, unique=True)
-    pdf_url = db.Column(String)
-    processed_at = db.Column(DateTime)
-
-class Insider(db.Model):
-    __tablename__ = 'insiders'
-    id = db.Column(BigInteger, primary_key=True)
-    company_cnpj = db.Column(String(14), ForeignKey('companies.cnpj'), nullable=False)
-    name = db.Column(String(255), nullable=False)
-    document = db.Column(String(14))
-    insider_type = db.Column(String(50), nullable=False)
-    created_at = db.Column(DateTime)
-
-class Transaction(db.Model):
-    __tablename__ = 'transactions'
-    id = db.Column(BigInteger, primary_key=True)
-    filing_id = db.Column(BigInteger, ForeignKey('filings.id'), nullable=False)
-    insider_id = db.Column(BigInteger, ForeignKey('insiders.id'), nullable=False)
-    transaction_date = db.Column(Date, nullable=False)
-    asset_type = db.Column(String(100))
-    asset_class = db.Column(String(50))
-    operation_type = db.Column(String(100))
-    quantity = db.Column(BigInteger, nullable=False)
-    price = db.Column(Numeric(20, 6))
-    volume = db.Column(Numeric(20, 4))
-    intermediary = db.Column(String(255))
-
-# --- MODELOS DE PORTFÓLIO ---
-
-class PortfolioConfig(db.Model):
-    __tablename__ = 'portfolio_config'
-    id = db.Column(Integer, primary_key=True)
-    ticker = db.Column(Text, nullable=False)
-    quantidade = db.Column(Integer, nullable=False)
-    posicao_alvo = db.Column(Float)
-
-class PortfolioHistory(db.Model):
-    __tablename__ = 'portfolio_history'
-    id = db.Column(Integer, primary_key=True)
-    data = db.Column(Date, nullable=False, unique=True)
-    cota = db.Column(Float)
-    ibov = db.Column(Float)
-
-class PortfolioMetric(db.Model):
-    __tablename__ = 'portfolio_metrics'
-    metric_key = db.Column(Text, primary_key=True)
-    metric_value = db.Column(Float)
-
-class RealtimeQuote(db.Model):
-    __tablename__ = 'realtime_quotes'
-    ticker = db.Column(Text, primary_key=True)
-    last_price = db.Column(Float)
-    previous_close = db.Column(Float)
-    updated_at = db.Column(DateTime)
-
-# --- OUTROS MODELOS ---
-
-class Transacao(db.Model): # Note o nome da classe 'Transacao' no singular
-    __tablename__ = 'transacoes'
-    id = db.Column(Integer, primary_key=True)
-    data = db.Column(Date)
-    descricao = db.Column(Text)
-    categoria = db.Column(Text)
-    valor = db.Column(Numeric(15, 2))
-    moeda = db.Column(String(10))
-    cnpj_companhia = db.Column(String(20), ForeignKey('companies.cnpj')) # Nome correto: cnpj_companhia
-    nome_companhia = db.Column(Text)
-    data_referencia = db.Column(Date)
-
-# (Opcional: Adicionar relacionamentos entre os modelos para facilitar as consultas)
-# Ex: Company.tickers = relationship("Ticker", back_populates="company")
-# Ex: Ticker.company = relationship("Company", back_populates="tickers")
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'cnpj_cia': self.cnpj_cia,
+            'denom_cia': self.denom_cia,
+            'cd_cvm': self.cd_cvm,
+            'versao': self.versao,
+            'dt_refer': self.dt_refer.isoformat() if self.dt_refer else None,
+            'dt_ini_exerc': self.dt_ini_exerc.isoformat() if self.dt_ini_exerc else None,
+            'dt_fim_exerc': self.dt_fim_exerc.isoformat() if self.dt_fim_exerc else None,
+            'cd_conta': self.cd_conta,
+            'ds_conta': self.ds_conta,
+            'vl_conta': float(self.vl_conta) if self.vl_conta is not None else None,
+            'escala_moeda': self.escala_moeda,
+            'moeda': self.moeda,
+            'ordem_exerc': self.ordem_exerc,
+            'tipo_demonstracao': self.tipo_demonstracao,
+            'periodo': self.periodo,
+        }
+# ... (outros modelos com seus respectivos métodos to_dict(), se necessário)
