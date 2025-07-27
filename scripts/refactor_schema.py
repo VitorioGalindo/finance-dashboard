@@ -130,8 +130,7 @@ def run_migration():
         conn = psycopg2.connect(conn_str)
         
         for stage, commands_list in commands.items():
-            print(f"
---- EXECUTANDO ESTÁGIO: {stage} ---")
+            print(f"--- EXECUTANDO ESTÁGIO: {stage} ---")
             with conn.cursor() as cur:
                 for description, command in commands_list:
                     try:
@@ -144,12 +143,10 @@ def run_migration():
                         raise e # Para a execução no primeiro erro
 
         conn.commit()
-        print("
-🎉 Migração de esquema concluída com sucesso!")
+        print("🎉 Migração de esquema concluída com sucesso!")
 
     except Exception as e:
-        print(f"
-❌ ERRO FATAL DURANTE A MIGRAÇÃO. O processo foi interrompido.")
+        print(f"❌ ERRO FATAL DURANTE A MIGRAÇÃO. O processo foi interrompido.")
     finally:
         if conn:
             conn.close()
