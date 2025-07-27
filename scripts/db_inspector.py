@@ -29,8 +29,7 @@ def inspect_database():
         with engine.connect() as connection:
             print(f"Dialeto do Banco: {connection.dialect.name}")
             server_version = connection.execute(text("SELECT version();")).scalar()
-            print(f"Versão do Servidor: {server_version}
-")
+            print(f"Versão do Servidor: {server_version}")
 
         schemas = inspector.get_schema_names()
         print(f"Esquemas encontrados: {schemas}")
@@ -40,14 +39,12 @@ def inspect_database():
             if schema.startswith('pg_') or schema == 'information_schema':
                 continue
 
-            print(f"
-{'='*30} ESQUEMA: {schema.upper()} {'='*30}")
+            print(f"{'='*30} ESQUEMA: {schema.upper()} {'='*30}")
             tables = sorted(inspector.get_table_names(schema=schema))
             print(f"Tabelas encontradas: {tables}")
 
             for table_name in tables:
-                print(f"
---- Tabela: {schema}.{table_name} ---")
+                print(f"--- Tabela: {schema}.{table_name} ---")
                 
                 try:
                     # Chaves Primárias
@@ -84,14 +81,10 @@ def inspect_database():
                     print(f"  ERRO ao inspecionar a estrutura da tabela {table_name}: {table_e}")
 
     except Exception as e:
-        print(f"
-Ocorreu um erro fatal durante a inspeção: {e}", file=sys.stderr)
+        print(f"Ocorreu um erro fatal durante a inspeção: {e}", file=sys.stderr)
         sys.exit(1) # Sai com código de erro para ser capturado por outros scripts
     finally:
-        print(f"
-{'='*70}
---- SCRIPT DE INSPEÇÃO CONCLUÍDO ---
-{'='*70}")
+        print(f"{'='*70}--- SCRIPT DE INSPEÇÃO CONCLUÍDO ---{'='*70}")
 
 if __name__ == "__main__":
     inspect_database()
