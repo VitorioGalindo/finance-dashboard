@@ -1,9 +1,8 @@
 # core/database.py
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from .config import settings
+# Importa a engine centralizada do nosso novo módulo
+from backend.database import engine
 
-engine = create_engine(settings.DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():
