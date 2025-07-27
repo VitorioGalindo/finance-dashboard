@@ -1,11 +1,8 @@
 Flask
-Flask-SQLAlchemy
+Flask-Cors
 psycopg2-binary
 pandas
 requests
+SQLAlchemy
+Flask-SQLAlchemy
 python-dotenv
-sqlalchemy
-Flask-Cors
-tqdm
-google-generativeai>=0.4.0
-pdfplumber
