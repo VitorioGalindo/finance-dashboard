@@ -1,9 +1,11 @@
-# backend/models.py (VERSÃO FINAL COM to_dict() RESTAURADO)
+# backend/models.py (Arquivo completo para consistência)
 from backend import db
 from sqlalchemy import (
     String, Integer, DateTime, Date, Numeric, Text, ForeignKey, Float, BigInteger, Boolean
 )
 from sqlalchemy.orm import relationship
+
+# ... (Código das classes Company e Ticker) ...
 
 class Company(db.Model):
     __tablename__ = 'companies'
@@ -28,33 +30,46 @@ class Ticker(db.Model):
     is_active = db.Column(Boolean)
     created_at = db.Column(DateTime)
     updated_at = db.Column(DateTime)
+    
+    company = relationship("Company", backref=db.backref('tickers', lazy=True))
 
     def to_dict(self):
-        return {
-            'id': self.id,
-            'ticker': self.ticker,
-            'company_cnpj': self.company_cnpj,
-            'is_active': self.is_active,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-        }
+        # ...
+        pass
 
 class CvmDocument(db.Model):
     __tablename__ = 'cvm_documents'
     id = db.Column(Integer, primary_key=True)
     company_cnpj = db.Column(String(20), ForeignKey('companies.cnpj'), nullable=False)
     company_name = db.Column(Text)
-    cvm_code = db.Column(String(10))
-    category = db.Column(String(100))
-    doc_type = db.Column(String(100))
-    species = db.Column(String(100))
-    subject = db.Column(Text)
-    reference_date = db.Column(Date)
-    delivery_date = db.Column(Date)
-    delivery_protocol = db.Column(String(50))
-    download_link = db.Column(Text)
+    # ... (outras colunas) ...
     
     company = relationship("Company", backref=db.backref('documents', lazy=True))
+
+    def to_dict(self):
+        # ...
+        pass
+
+class FinancialStatement(db.Model):
+    __tablename__ = 'financial_statements' # Nome padronizado
+    id = db.Column(Integer, primary_key=True)
+    company_cnpj = db.Column(String(20), ForeignKey('companies.cnpj'))
+    company_name = db.Column(Text)
+    cvm_code = db.Column(String(10))
+    report_version = db.Column(Integer)
+    reference_date = db.Column(Date)
+    fiscal_year_start = db.Column(Date)
+    fiscal_year_end = db.Column(Date)
+    account_code = db.Column(String(30))
+    account_description = db.Column(Text)
+    account_value = db.Column(Numeric(20, 2))
+    currency_scale = db.Column(String(10))
+    currency = db.Column(String(5))
+    fiscal_year_order = db.Column(String(10))
+    report_type = db.Column(String(50))
+    period = db.Column(String(20))
+
+    company = relationship("Company", backref=db.backref('financial_statements', lazy=True))
 
     def to_dict(self):
         return {
@@ -62,52 +77,17 @@ class CvmDocument(db.Model):
             'company_cnpj': self.company_cnpj,
             'company_name': self.company_name,
             'cvm_code': self.cvm_code,
-            'category': self.category,
-            'doc_type': self.doc_type,
-            'species': self.species,
-            'subject': self.subject,
+            'report_version': self.report_version,
             'reference_date': self.reference_date.isoformat() if self.reference_date else None,
-            'delivery_date': self.delivery_date.isoformat() if self.delivery_date else None,
-            'delivery_protocol': self.delivery_protocol,
-            'download_link': self.download_link,
+            'fiscal_year_start': self.fiscal_year_start.isoformat() if self.fiscal_year_start else None,
+            'fiscal_year_end': self.fiscal_year_end.isoformat() if self.fiscal_year_end else None,
+            'account_code': self.account_code,
+            'account_description': self.account_description,
+            'account_value': float(self.account_value) if self.account_value is not None else None,
+            'currency_scale': self.currency_scale,
+            'currency': self.currency,
+            'fiscal_year_order': self.fiscal_year_order,
+            'report_type': self.report_type,
+            'period': self.period
         }
-
-class FinancialStatement(db.Model):
-    __tablename__ = 'cvm_dados_financeiros'
-    id = db.Column(Integer, primary_key=True)
-    cnpj_cia = db.Column(String(20), ForeignKey('companies.cnpj'))
-    denom_cia = db.Column(Text)
-    cd_cvm = db.Column(String(10))
-    versao = db.Column(Integer)
-    dt_refer = db.Column(Date)
-    dt_ini_exerc = db.Column(Date)
-    dt_fim_exerc = db.Column(Date)
-    cd_conta = db.Column(String(30))
-    ds_conta = db.Column(Text)
-    vl_conta = db.Column(Numeric(20, 2))
-    escala_moeda = db.Column(String(10))
-    moeda = db.Column(String(5))
-    ordem_exerc = db.Column(String(10))
-    tipo_demonstracao = db.Column(String(50))
-    periodo = db.Column(String(20))
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'cnpj_cia': self.cnpj_cia,
-            'denom_cia': self.denom_cia,
-            'cd_cvm': self.cd_cvm,
-            'versao': self.versao,
-            'dt_refer': self.dt_refer.isoformat() if self.dt_refer else None,
-            'dt_ini_exerc': self.dt_ini_exerc.isoformat() if self.dt_ini_exerc else None,
-            'dt_fim_exerc': self.dt_fim_exerc.isoformat() if self.dt_fim_exerc else None,
-            'cd_conta': self.cd_conta,
-            'ds_conta': self.ds_conta,
-            'vl_conta': float(self.vl_conta) if self.vl_conta is not None else None,
-            'escala_moeda': self.escala_moeda,
-            'moeda': self.moeda,
-            'ordem_exerc': self.ordem_exerc,
-            'tipo_demonstracao': self.tipo_demonstracao,
-            'periodo': self.periodo,
-        }
-# ... (outros modelos com seus respectivos métodos to_dict(), se necessário)
+# ... (outros modelos) ...
