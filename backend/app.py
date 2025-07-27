@@ -20,7 +20,10 @@ def create_app():
     # Importa e registra os blueprints DENTRO da função de fábrica
     # para evitar importações circulares.
     from backend.routes.companies_routes import companies_bp
+    from backend.routes.documents_routes import documents_bp # <-- ADICIONAR ESTA LINHA
+
     app.register_blueprint(companies_bp, url_prefix='/api')
+    app.register_blueprint(documents_bp, url_prefix='/api') # <-- ADICIONAR ESTA LINHA
 
     @app.route('/')
     def index():

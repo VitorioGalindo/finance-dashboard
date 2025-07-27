@@ -90,37 +90,37 @@ class FinancialStatement(db.Model):
         }
 
 class CvmDocument(db.Model):
-    __tablename__ = 'cvm_documents'
+    __tablename__ = 'cvm_documentos_ipe'
 
-    id = db.Column(Integer, primary_key=True)
-    company_cnpj = db.Column(String(20), ForeignKey('companies.cnpj'), nullable=False)
-    company_name = db.Column(Text)
-    cvm_code = db.Column(String(10))
-    category = db.Column(String(100))
-    doc_type = db.Column(String(100))
-    species = db.Column(String(100))
-    subject = db.Column(Text)
-    reference_date = db.Column(Date)
-    delivery_date = db.Column(Date)
-    delivery_protocol = db.Column(String(50))
-    download_link = db.Column(Text)
+    id = db.Column(Integer, primary_key=True, autoincrement=True)
+    cnpj_companhia = db.Column('cnpj_companhia', String(20), ForeignKey('companies.cnpj'))
+    nome_companhia = db.Column(Text)
+    codigo_cvm = db.Column(String(10))
+    categoria = db.Column(String(100))
+    tipo = db.Column(String(100))
+    especie = db.Column(String(100))
+    assunto = db.Column(Text)
+    data_referencia = db.Column(Date)
+    data_entrega = db.Column(Date)
+    protocolo_entrega = db.Column(String(30))
+    link_download = db.Column(Text)
     
     company = relationship("Company", back_populates="documents")
 
     def to_dict(self):
         return {
             'id': self.id,
-            'company_cnpj': self.company_cnpj,
-            'company_name': self.company_name,
-            'cvm_code': self.cvm_code,
-            'category': self.category,
-            'doc_type': self.doc_type,
-            'species': self.species,
-            'subject': self.subject,
-            'reference_date': self.reference_date.isoformat() if self.reference_date else None,
-            'delivery_date': self.delivery_date.isoformat() if self.delivery_date else None,
-            'delivery_protocol': self.delivery_protocol,
-            'download_link': self.download_link
+            'company_cnpj': self.cnpj_companhia,
+            'company_name': self.nome_companhia,
+            'cvm_code': self.codigo_cvm,
+            'category': self.categoria,
+            'doc_type': self.tipo,
+            'species': self.especie,
+            'subject': self.assunto,
+            'reference_date': self.data_referencia.isoformat() if self.data_referencia else None,
+            'delivery_date': self.data_entrega.isoformat() if self.data_entrega else None,
+            'delivery_protocol': self.protocolo_entrega,
+            'download_link': self.link_download
         }
 
 class PortfolioConfig(db.Model):
@@ -128,54 +128,42 @@ class PortfolioConfig(db.Model):
     
     id = db.Column(Integer, primary_key=True)
     ticker = db.Column(String(10), nullable=False)
-    quantity = db.Column(Integer, nullable=False)
-    target_weight = db.Column(Float, nullable=False)
+    quantidade = db.Column(Integer, nullable=False)
+    posicao_alvo = db.Column(Float, nullable=False)
 
     def to_dict(self):
         return {
             'id': self.id,
             'ticker': self.ticker,
-            'quantity': self.quantity,
-            'target_weight': self.target_weight,
+            'quantity': self.quantidade,
+            'target_weight': self.posicao_alvo,
         }
 
 class PortfolioHistory(db.Model):
     __tablename__ = 'portfolio_history'
 
     id = db.Column(Integer, primary_key=True)
-    date = db.Column(Date, nullable=False, default=func.current_date())
-    net_liquidity = db.Column(Float)
-    quote_value = db.Column(Float)
-    daily_change = db.Column(Float)
-    buy_position = db.Column(Float)
-    sell_position = db.Column(Float)
-    net_long = db.Column(Float)
-    exposure = db.Column(Float)
+    data = db.Column(Date, nullable=False, default=func.current_date())
+    cota = db.Column(Float)
+    ibov = db.Column(Float)
 
     def to_dict(self):
         return {
             'id': self.id,
-            'date': self.date.isoformat() if self.date else None,
-            'net_liquidity': self.net_liquidity,
-            'quote_value': self.quote_value,
-            'daily_change': self.daily_change,
-            'buy_position': self.buy_position,
-            'sell_position': self.sell_position,
-            'net_long': self.net_long,
-            'exposure': self.exposure,
+            'date': self.data.isoformat() if self.data else None,
+            'cota': self.cota,
+            'ibov': self.ibov,
         }
 
 class PortfolioMetric(db.Model):
     __tablename__ = 'portfolio_metrics'
 
-    id = db.Column(Integer, primary_key=True)
-    metric_name = db.Column(String(100), nullable=False)
-    metric_value = db.Column(Float, nullable=False)
+    metric_key = db.Column(Text, primary_key=True)
+    metric_value = db.Column(Float)
     
     def to_dict(self):
         return {
-            'id': self.id,
-            'metric_name': self.metric_name,
+            'metric_key': self.metric_key,
             'metric_value': self.metric_value,
         }
 
