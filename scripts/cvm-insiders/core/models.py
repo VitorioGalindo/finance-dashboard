@@ -1,4 +1,4 @@
-# core/models.py
+# core/models.py (CORRIGIDO)
 from sqlalchemy import (Column, String, BigInteger, Date,
                         ForeignKey, TIMESTAMP, NUMERIC, Boolean)
 from sqlalchemy.orm import relationship, declarative_base
@@ -34,7 +34,7 @@ class Filing(Base):
     company = relationship("Company")
 
 class Transaction(Base):
-    __tablename__ = 'insider_transactions' # <-- CORRIGIDO AQUI
+    __tablename__ = 'insider_transactions' # <-- CORREÇÃO APLICADA AQUI
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     filing_id = Column(BigInteger, ForeignKey('filings.id'), nullable=False)
     insider_id = Column(BigInteger, ForeignKey('insiders.id'), nullable=False)
