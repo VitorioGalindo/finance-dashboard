@@ -28,8 +28,7 @@ def get_existing_companies(conn):
 
 def process_financial_data(year, report_type_abbr, period_name, existing_companies):
     """Busca e processa um ano de dados DFP ou ITR, apenas para empresas existentes."""
-    print(f"
-Buscando dados {period_name} para o ano: {year}...")
+    print(f"Buscando dados {period_name} para o ano: {year}...")
     
     conn_str = get_db_connection_string()
     conn = None
@@ -133,5 +132,4 @@ if __name__ == "__main__":
     finally:
         if main_conn: main_conn.close()
 
-    print("
---- CARGA DE DADOS FINANCEIROS CONCLUÍDA ---")
+    print("--- CARGA DE DADOS FINANCEIROS CONCLUÍDA ---")
