@@ -1,4 +1,4 @@
-# scripts/populate_master_companies_list.py (Versão Profissional de Enriquecimento)
+# scripts/build_master_company_list.py
 import os
 import sys
 import pandas as pd
@@ -439,30 +439,47 @@ def get_cvm_data():
         res_cad = requests.get(url_cad, timeout=60)
         res_cad.raise_for_status()
         df_cad = pd.read_csv(io.StringIO(res_cad.content.decode('latin-1')), sep=';', dtype=str)
-        df_cad['CNPJ_CIA_cleaned'] = df_cad['CNPJ_CIA'].str.replace(r'\D', '', regex=True)
+        df_cad['CNPJ_CIA'] = df_cad['CNPJ_CIA'].str.replace(r'\D', '', regex=True)
         print("Dados cadastrais baixados.")
 
         print("Baixando dados de valores mobiliários da CVM (FCA)...")
         year = datetime.now().year
-        url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
-        res_fca = requests.get(url_fca, timeout=120)
-        res_fca.raise_for_status()
+        # Tenta o ano atual, se falhar, tenta o ano anterior
+        try:
+            url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
+            res_fca = requests.get(url_fca, timeout=120)
+            if res_fca.status_code != 200:
+                print(f"Arquivo FCA para {year} não encontrado, tentando ano anterior...")
+                year -= 1
+                url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
+                res_fca = requests.get(url_fca, timeout=120)
+            res_fca.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            print(f"ERRO: Não foi possível baixar o arquivo FCA para {year} ou {year-1}. Detalhes: {e}")
+            raise e
+
         zip_buffer = io.BytesIO(res_fca.content)
         with zipfile.ZipFile(zip_buffer) as z:
             file_name = f"fca_cia_aberta_valor_mobiliario_{year}.csv"
             with z.open(file_name) as f:
                 df_fca = pd.read_csv(f, sep=';', encoding='latin-1', dtype=str)
-        df_fca['CNPJ_CIA_cleaned'] = df_fca['CNPJ_CIA'].str.replace(r'\D', '', regex=True)
-        print("Dados de valores mobiliários baixados.")
+        
+        # CORREÇÃO: Garante que a coluna CNPJ_CIA existe antes de limpá-la
+        if 'CNPJ_CIA' in df_fca.columns:
+            df_fca['CNPJ_CIA'] = df_fca['CNPJ_CIA'].str.replace(r'\D', '', regex=True)
+        else:
+            raise KeyError("A coluna 'CNPJ_CIA' não foi encontrada no arquivo FCA da CVM.")
+            
+        print(f"Dados de valores mobiliários ({year}) baixados.")
         
         return df_cad, df_fca
     except Exception as e:
-        print(f"❌ ERRO ao baixar dados da CVM: {e}")
+        print(f"❌ ERRO CRÍTICO ao baixar dados da CVM: {e}")
         return pd.DataFrame(), pd.DataFrame()
 
 def run_etl():
     """Orquestra o processo de ETL para criar a lista mestra de empresas."""
-    print("--- INICIANDO ETL DA LISTA MESTRA DE EMPRESAS (VERSÃO 2.0) ---")
+    print("--- INICIANDO ETL DA LISTA MESTRA DE EMPRESAS (VERSÃO PROFISSIONAL) ---")
     
     engine = create_engine(get_db_connection_string())
     Session = sessionmaker(bind=engine)
@@ -480,25 +497,25 @@ def run_etl():
         # FASE 2: TRANSFORMAÇÃO (ENRIQUECIMENTO)
         print("Enriquecendo dados com informações da CVM...")
         
-        df_fca_filtered = df_fca[df_fca['CODIGO_NEGOCIACAO'].str.upper().isin(reference_tickers)]
+        df_fca_filtered = df_fca[df_fca['CODIGO_NEGOCIACAO'].str.upper().isin(reference_tickers)].copy()
         
         df_merged = pd.merge(
             df_cad,
-            df_fca_filtered[['CNPJ_CIA_cleaned', 'CODIGO_NEGOCIACAO']],
-            on='CNPJ_CIA_cleaned',
+            df_fca_filtered[['CNPJ_CIA', 'CODIGO_NEGOCIACAO']],
+            on='CNPJ_CIA',
             how='inner'
         )
         
         print("Agrupando tickers por empresa...")
         agg_funcs = {
-            'CODIGO_NEGOCIACAO': lambda x: sorted(list(x.unique())),
+            'CODIGO_NEGOCIACAO': (lambda x: sorted(list(x.unique()))),
             'DENOM_SOCIAL': 'first',
             'CD_CVM': 'first',
             'SETOR_ATIV': 'first',
             'ATIV_PRINC': 'first',
             'PAG_WEB': 'first'
         }
-        df_final_agg = df_merged.groupby('CNPJ_CIA_cleaned').agg(agg_funcs).reset_index()
+        df_final_agg = df_merged.groupby('CNPJ_CIA').agg(agg_funcs).reset_index()
 
         print(f"{len(df_final_agg)} empresas únicas foram encontradas e enriquecidas.")
 
@@ -511,10 +528,10 @@ def run_etl():
         companies_to_load = []
         for _, row in df_final_agg.iterrows():
             companies_to_load.append({
-                'cnpj': row['CNPJ_CIA_cleaned'],
+                'cnpj': row['CNPJ_CIA'],
                 'cvm_code': int(row['CD_CVM']),
                 'company_name': row['DENOM_SOCIAL'],
-                'trade_name': row['DENOM_SOCIAL'], # Usando o nome social como fallback
+                'trade_name': row['DENOM_SOCIAL'],
                 'is_b3_listed': True,
                 'tickers': row['CODIGO_NEGOCIACAO'],
                 'b3_sector': row.get('SETOR_ATIV'),
