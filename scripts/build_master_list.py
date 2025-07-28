@@ -1,35 +1,27 @@
-# scripts/build_master_list.py (Versão Final e Corrigida)
+# scripts/build_master_list.py (Versão Definitiva com Mapeamento de Colunas)
 import os
 import sys
 import pandas as pd
+import requests
+import zipfile
 import io
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
-import requests
-import zipfile
 
 # --- CONFIGURAÇÃO DE PATH ---
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scraper')))
-
-# --- IMPORTAÇÕES ---
 from models import Base, Company
 
 def get_db_connection_string():
-    """Lê as credenciais do .env na raiz do projeto."""
     load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
-    user = os.getenv("DB_USER")
-    password = os.getenv("DB_PASSWORD")
-    host = os.getenv("DB_HOST")
-    dbname = os.getenv("DB_NAME", "postgres")
-    if not all([user, password, host, dbname]):
-        raise ValueError("Credenciais do banco de dados não encontradas.")
+    user, password, host, dbname = os.getenv("DB_USER"), os.getenv("DB_PASSWORD"), os.getenv("DB_HOST"), os.getenv("DB_NAME", "postgres")
+    if not all([user, password, host, dbname]): raise ValueError("Credenciais do banco não encontradas.")
     return f"postgresql+psycopg2://{user}:{password}@{host}/{dbname}?sslmode=require"
 
 def get_reference_tickers():
-    """Carrega apenas o conjunto de tickers da sua lista de referência."""
     csv_data = """"Ticker","Nome"
 "BBAS3","Banco do Brasil"
 "AZUL4","Azul"
@@ -439,18 +431,22 @@ def get_cvm_data():
         res_cad = requests.get(url_cad, timeout=60)
         res_cad.raise_for_status()
         df_cad = pd.read_csv(io.StringIO(res_cad.content.decode('latin-1')), sep=';', dtype=str)
-        df_cad['CNPJ_CIA'] = df_cad['CNPJ_CIA'].str.replace(r'\D', '', regex=True)
+        df_cad.rename(columns={'CNPJ_CIA': 'cnpj'}, inplace=True)
+        df_cad['cnpj'] = df_cad['cnpj'].str.replace(r'\D', '', regex=True)
         print("Dados cadastrais baixados.")
 
         print("Baixando dados de valores mobiliários da CVM (FCA)...")
         year = datetime.now().year
-        url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
-        res_fca = requests.get(url_fca, timeout=120)
-        if res_fca.status_code != 200:
-            year -= 1
+        try:
             url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
             res_fca = requests.get(url_fca, timeout=120)
-        res_fca.raise_for_status()
+            if res_fca.status_code != 200:
+                year -= 1
+                url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
+                res_fca = requests.get(url_fca, timeout=120)
+            res_fca.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            raise e
 
         zip_buffer = io.BytesIO(res_fca.content)
         with zipfile.ZipFile(zip_buffer) as z:
@@ -458,13 +454,9 @@ def get_cvm_data():
             with z.open(file_name) as f:
                 df_fca = pd.read_csv(f, sep=';', encoding='latin-1', dtype=str)
         
-        # CORREÇÃO: Usa o nome de coluna correto 'CNPJ_Companhia' do arquivo FCA
-        if 'CNPJ_Companhia' in df_fca.columns:
-            df_fca.rename(columns={'CNPJ_Companhia': 'CNPJ_CIA'}, inplace=True)
-            df_fca['CNPJ_CIA'] = df_fca['CNPJ_CIA'].str.replace(r'\D', '', regex=True)
-        else:
-            raise KeyError("A coluna 'CNPJ_Companhia' não foi encontrada no arquivo FCA da CVM.")
-            
+        # USA O NOME DE COLUNA CORRETO
+        df_fca.rename(columns={'CNPJ_Companhia': 'cnpj', 'Codigo_Negociacao': 'ticker'}, inplace=True)
+        df_fca['cnpj'] = df_fca['cnpj'].str.replace(r'\D', '', regex=True)
         print(f"Dados de valores mobiliários ({year}) baixados.")
         
         return df_cad, df_fca
@@ -484,23 +476,21 @@ def run_etl():
         reference_tickers = get_reference_tickers()
         df_cad, df_fca = get_cvm_data()
 
-        if df_cad.empty or df_fca.empty:
-            return
+        if df_cad.empty or df_fca.empty: return
 
         print("Enriquecendo dados com informações da CVM...")
         
-        # CORREÇÃO: Usa 'CODIGO_NEGOCIACAO' que é o nome correto da coluna de ticker no arquivo FCA
-        df_fca_filtered = df_fca[df_fca['CODIGO_NEGOCIACAO'].str.upper().isin(reference_tickers)].copy()
+        df_fca_filtered = df_fca[df_fca['ticker'].str.upper().isin(reference_tickers)].copy()
         
-        df_merged = pd.merge(df_cad, df_fca_filtered[['CNPJ_CIA', 'CODIGO_NEGOCIACAO']], on='CNPJ_CIA', how='inner')
+        df_merged = pd.merge(df_cad, df_fca_filtered[['cnpj', 'ticker']], on='cnpj', how='inner')
         
         print("Agrupando tickers por empresa...")
         agg_funcs = {
-            'CODIGO_NEGOCIACAO': (lambda x: sorted(list(x.unique()))),
+            'ticker': (lambda x: sorted(list(x.unique()))),
             'DENOM_SOCIAL': 'first', 'CD_CVM': 'first', 'SETOR_ATIV': 'first',
             'ATIV_PRINC': 'first', 'PAG_WEB': 'first'
         }
-        df_final_agg = df_merged.groupby('CNPJ_CIA').agg(agg_funcs).reset_index()
+        df_final_agg = df_merged.groupby('cnpj').agg(agg_funcs).reset_index()
 
         print(f"{len(df_final_agg)} empresas únicas foram encontradas e enriquecidas.")
 
@@ -512,12 +502,12 @@ def run_etl():
         companies_to_load = []
         for _, row in df_final_agg.iterrows():
             companies_to_load.append({
-                'cnpj': row['CNPJ_CIA'],
+                'cnpj': row['cnpj'],
                 'cvm_code': int(row['CD_CVM']),
                 'company_name': row['DENOM_SOCIAL'],
                 'trade_name': row['DENOM_SOCIAL'],
                 'is_b3_listed': True,
-                'tickers': row['CODIGO_NEGOCIACAO'],
+                'tickers': row['ticker'],
                 'b3_sector': row.get('SETOR_ATIV'),
                 'main_activity': row.get('ATIV_PRINC'),
                 'website': row.get('PAG_WEB')
