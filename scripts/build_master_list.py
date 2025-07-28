@@ -1,20 +1,19 @@
-# scripts/build_master_list.py (CORRIGIDO)
+# scripts/build_master_list.py (Versão Autônoma e Definitiva)
 import os
 import sys
 import pandas as pd
+import requests
+import zipfile
 import io
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from datetime import datetime
 
 # --- CONFIGURAÇÃO DE PATH ---
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Adiciona a pasta 'scraper' ao path para que possamos importar seus modelos
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scraper')))
-
-# --- IMPORTAÇÕES ---
-from models import Base, Company
-# A classe correta a ser usada é CVMScraper, que contém os métodos de scraping
-from services.scraper_cvm import CVMScraper
+from models import Base, Company # Importa a definição da tabela de destino
 
 def get_db_connection_string():
     """Lê as credenciais do .env na raiz do projeto."""
@@ -201,7 +200,7 @@ def get_reference_tickers():
 "JSLG3","JSL"
 "PINE4","Banco Pine"
 "MATD3","Mater Dei"
-"BLAU3","Blau Farmacêutica"
+"BLAU3","Blau Farmaceutica"
 "RANI3","Irani"
 "SYNE3","SYN"
 "ESPA3","Espaçolaser"
@@ -430,6 +429,47 @@ def get_reference_tickers():
     df = pd.read_csv(io.StringIO(csv_data))
     return set(df['Ticker'].str.upper())
 
+def get_cvm_data():
+    """Baixa e processa os arquivos de cadastro e valores mobiliários da CVM."""
+    print("Baixando dados cadastrais da CVM (cad_cia_aberta.csv)...")
+    try:
+        url_cad = "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
+        res_cad = requests.get(url_cad, timeout=60)
+        res_cad.raise_for_status()
+        df_cad = pd.read_csv(io.StringIO(res_cad.content.decode('latin-1')), sep=';', dtype=str)
+        df_cad['CNPJ_CIA'] = df_cad['CNPJ_CIA'].str.replace(r'\D', '', regex=True)
+        print("Dados cadastrais baixados.")
+
+        print("Baixando dados de valores mobiliários da CVM (FCA)...")
+        year = datetime.now().year
+        url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
+        res_fca = requests.get(url_fca, timeout=120)
+        if res_fca.status_code != 200:
+            year -= 1
+            url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
+            res_fca = requests.get(url_fca, timeout=120)
+        res_fca.raise_for_status()
+
+        zip_buffer = io.BytesIO(res_fca.content)
+        with zipfile.ZipFile(zip_buffer) as z:
+            file_name = f"fca_cia_aberta_valor_mobiliario_{year}.csv"
+            with z.open(file_name) as f:
+                df_fca = pd.read_csv(f, sep=';', encoding='latin-1', dtype=str)
+        
+        # CORREÇÃO: Usa o nome de coluna correto 'CNPJ_Companhia' do arquivo FCA
+        if 'CNPJ_Companhia' in df_fca.columns:
+            df_fca.rename(columns={'CNPJ_Companhia': 'CNPJ_CIA'}, inplace=True)
+            df_fca['CNPJ_CIA'] = df_fca['CNPJ_CIA'].str.replace(r'\D', '', regex=True)
+        else:
+            raise KeyError("A coluna 'CNPJ_Companhia' não foi encontrada no arquivo FCA da CVM.")
+            
+        print(f"Dados de valores mobiliários ({year}) baixados.")
+        
+        return df_cad, df_fca
+    except Exception as e:
+        print(f"❌ ERRO CRÍTICO ao baixar dados da CVM: {e}")
+        return pd.DataFrame(), pd.DataFrame()
+
 def run_etl():
     """Orquestra o processo de ETL para criar a lista mestra de empresas."""
     print("--- INICIANDO ETL DA LISTA MESTRA DE EMPRESAS (PROFISSIONAL) ---")
@@ -439,48 +479,48 @@ def run_etl():
     session = Session()
 
     try:
-        # FASE 1: EXTRAÇÃO
         reference_tickers = get_reference_tickers()
-        
-        print("Buscando dados da CVM usando o scraper avançado...")
-        cvm_scraper = CVMScraper() # Usando a classe base que contém o método
-        companies_data = cvm_scraper.scrape_companies_registry()
-        df_cad = pd.DataFrame(companies_data)
-        
-        # Simula a obtenção do df_fca para o merge, extraindo tickers do df_cad se possível
-        # ou de uma fonte secundária se necessário. Por simplicidade, vamos assumir que
-        # os tickers podem ser derivados ou buscados a partir do df_cad.
-        # Esta parte pode ser aprimorada com o scraper de FCA.
-        
-        if df_cad.empty:
-            print("Não foi possível obter os dados da CVM com o scraper. Abortando.")
+        df_cad, df_fca = get_cvm_data()
+
+        if df_cad.empty or df_fca.empty:
             return
 
-        # FASE 2: TRANSFORMAÇÃO
-        print("Filtrando e enriquecendo dados...")
+        print("Enriquecendo dados com informações da CVM...")
         
-        # Limpa o CNPJ para o merge
-        df_cad['cnpj'] = df_cad['cnpj'].str.replace(r'\D', '', regex=True)
+        df_fca_filtered = df_fca[df_fca['CODIGO_NEGOCIACAO'].str.upper().isin(reference_tickers)].copy()
+        
+        df_merged = pd.merge(df_cad, df_fca_filtered[['CNPJ_CIA', 'CODIGO_NEGOCIACAO']], on='CNPJ_CIA', how='inner')
+        
+        print("Agrupando tickers por empresa...")
+        agg_funcs = {
+            'CODIGO_NEGOCIACAO': (lambda x: sorted(list(x.unique()))),
+            'DENOM_SOCIAL': 'first', 'CD_CVM': 'first', 'SETOR_ATIV': 'first',
+            'ATIV_PRINC': 'first', 'PAG_WEB': 'first'
+        }
+        df_final_agg = df_merged.groupby('CNPJ_CIA').agg(agg_funcs).reset_index()
 
-        # A lógica de merge e agregação pode ser simplificada se o scraper já nos dá
-        # uma lista limpa. Vamos focar em popular a partir do que o scraper retorna.
-        
-        # Filtra as empresas do scraper da CVM com base nos tickers de referência
-        # (Isso requer uma forma de mapear CNPJ/CVM_CODE para Ticker)
-        # Por agora, vamos inserir todas as empresas encontradas pelo scraper que são da B3.
-        df_final = df_cad[df_cad['is_b3_listed'] == True].copy()
-        print(f"{len(df_final)} empresas listadas na B3 foram encontradas pelo scraper.")
-        
-        # FASE 3: CARGA
+        print(f"{len(df_final_agg)} empresas únicas foram encontradas e enriquecidas.")
+
         print("Limpando a tabela 'companies' (e tabelas dependentes)...")
         session.execute(text("TRUNCATE TABLE public.companies RESTART IDENTITY CASCADE;"))
         
-        print(f"Populando a tabela 'companies' com {len(df_final)} registros...")
+        print(f"Populando a tabela 'companies' com {len(df_final_agg)} registros...")
         
-        companies_to_load = df_final.to_dict(orient='records')
+        companies_to_load = []
+        for _, row in df_final_agg.iterrows():
+            companies_to_load.append({
+                'cnpj': row['CNPJ_CIA'],
+                'cvm_code': int(row['CD_CVM']),
+                'company_name': row['DENOM_SOCIAL'],
+                'trade_name': row['DENOM_SOCIAL'],
+                'is_b3_listed': True,
+                'tickers': row['CODIGO_NEGOCIACAO'],
+                'b3_sector': row.get('SETOR_ATIV'),
+                'main_activity': row.get('ATIV_PRINC'),
+                'website': row.get('PAG_WEB')
+            })
         
         if companies_to_load:
-            # O bulk_insert_mappings espera uma lista de dicionários, o que to_dict('records') fornece
             session.bulk_insert_mappings(Company, companies_to_load)
 
         session.commit()
