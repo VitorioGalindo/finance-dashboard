@@ -1,8 +1,8 @@
 # scripts/refactor_schema.py
 import os
 import sys
-from sqlalchemy import create_engine, inspect, text, BigInteger, Text, JSON, String
-import logging
+from sqlalchemy import create_engine, inspect, text, BigInteger, Text, JSON, String, Integer
+from sqlalchemy.orm import sessionmaker
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from scraper.config import DATABASE_URL
@@ -34,14 +34,15 @@ def update_database_schema():
         logger.info("Nenhuma nova tabela precisa ser criada.")
 
     # 2. Alteração de Tipos de Coluna (Generalizado)
+    # CORREÇÃO: Usar instâncias dos tipos (ex: BigInteger()) em vez das classes
     tables_to_check = {
         'capital_structure': {
-            'qty_ordinary_shares': BigInteger,
-            'qty_preferred_shares': BigInteger,
-            'qty_total_shares': BigInteger,
+            'qty_ordinary_shares': BigInteger(),
+            'qty_preferred_shares': BigInteger(),
+            'qty_total_shares': BigInteger(),
         },
         'company_administrators': {
-            'term_of_office': String(100)
+            'term_of_office': String(100) # String já é instanciado com o comprimento
         }
     }
 
@@ -51,35 +52,39 @@ def update_database_schema():
                 logger.info(f"Verificando colunas na tabela '{table_name}'...")
                 db_columns = {col['name']: col['type'] for col in inspector.get_columns(table_name)}
                 
-                for col_name, col_type in columns_to_alter.items():
-                    target_type = col_type.compile(dialect=engine.dialect)
-                    db_type = db_columns.get(col_name).compile(dialect=engine.dialect)
+                for col_name, col_type_instance in columns_to_alter.items():
+                    target_type_str = col_type_instance.compile(dialect=engine.dialect)
+                    
+                    if col_name in db_columns:
+                        db_type_instance = db_columns[col_name]
+                        
+                        # Compara o tipo genérico e o comprimento para VARCHAR
+                        is_different = not isinstance(db_type_instance, type(col_type_instance)) or \
+                                       (isinstance(col_type_instance, String) and db_type_instance.length < col_type_instance.length)
 
-                    # Compara o tipo genérico e o comprimento para VARCHAR
-                    is_different = type(db_columns.get(col_name)) != type(col_type) or \
-                                   (isinstance(col_type, String) and db_columns.get(col_name).length < col_type.length)
-
-                    if col_name in db_columns and is_different:
-                        logger.info(f"Alterando tipo da coluna '{col_name}' em '{table_name}' para {target_type}...")
-                        sql = text(f'ALTER TABLE {table_name} ALTER COLUMN "{col_name}" TYPE {target_type};')
-                        connection.execute(sql)
-                        connection.commit()
-                    else:
-                        logger.info(f"Coluna '{col_name}' em '{table_name}' já está com o tipo correto.")
+                        if is_different:
+                            logger.info(f"Alterando tipo da coluna '{col_name}' em '{table_name}' para {target_type_str.upper()}...")
+                            sql = text(f'ALTER TABLE {table_name} ALTER COLUMN "{col_name}" TYPE {target_type_str.upper()};')
+                            connection.execute(sql)
+                            connection.commit()
+                        else:
+                            logger.info(f"Coluna '{col_name}' em '{table_name}' já está com o tipo correto.")
             
     # 3. Adição de Colunas à Tabela 'companies'
     company_columns_to_add = {
-        'activity_description': Text,
-        'capital_structure_summary': JSON,
+        'activity_description': Text(),
+        'capital_structure_summary': JSON(),
     }
     
     if 'companies' in existing_tables:
         logger.info("Verificando colunas na tabela 'companies'...")
         companies_table_columns = [col['name'] for col in inspector.get_columns('companies')]
         with engine.connect() as connection:
-            for col_name, col_type in company_columns_to_add.items():
+            for col_name, col_type_instance in company_columns_to_add.items():
                 if col_name not in companies_table_columns:
-                    sql = text(f'ALTER TABLE companies ADD COLUMN "{col_name}" {col_type().compile(dialect=engine.dialect)};')
+                    target_type_str = col_type_instance.compile(dialect=engine.dialect)
+                    logger.info(f"Adicionando coluna '{col_name}' à tabela 'companies'...")
+                    sql = text(f'ALTER TABLE companies ADD COLUMN "{col_name}" {target_type_str.upper()};')
                     connection.execute(sql)
                     connection.commit()
 
