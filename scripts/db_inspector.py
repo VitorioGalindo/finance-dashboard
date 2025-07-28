@@ -53,8 +53,7 @@ def analyze_fre_zip_structure(year: int):
             return
 
         for i, filename in enumerate(csv_files):
-            print("
-" + "="*80)
+            print("" + "="*80)
             print(f"ARQUIVO {i+1}/{len(csv_files)}: {filename}")
             print("="*80)
             
@@ -67,8 +66,7 @@ def analyze_fre_zip_structure(year: int):
                     for col in df.columns:
                         print(f"  - {col}")
                         
-                    print("
-AMOSTRA DOS DADOS (primeiras 3 linhas):")
+                    print("AMOSTRA DOS DADOS (primeiras 3 linhas):")
                     print(df.head(3).to_string())
                     
                 except Exception as e:
@@ -79,18 +77,15 @@ AMOSTRA DOS DADOS (primeiras 3 linhas):")
         return
         
     print("
-
 --- ANÁLISE ESTRUTURAL DO FRE CONCLUÍDA ---")
     propose_db_schema()
 
 def propose_db_schema():
     """Exibe uma proposta de como os dados do FRE poderiam ser modelados no banco."""
-    print("
-" + "#"*80)
+    print("" + "#"*80)
     print("PROPOSTA DE MODELAGEM DE DADOS PARA O FORMULÁRIO DE REFERÊNCIA (FRE)")
     print("#"*80)
-    print("""
-Baseado na análise, os dados do FRE são muito ricos e granulares. Em vez de adicionar dezenas de colunas à tabela 'companies',
+    print("""Baseado na análise, os dados do FRE são muito ricos e granulares. Em vez de adicionar dezenas de colunas à tabela 'companies',
 sugiro a criação de novas tabelas relacionadas para capturar essas informações.
 
 PROPOSTA:
@@ -160,6 +155,5 @@ if __name__ == '__main__':
         print("Uso Padrão: python scripts/db_inspector.py <codigo_cvm>")
         print("Teste DRE: python scripts/db_inspector.py dre <codigo_cvm> <ano1> ...")
         print("NOVA ANÁLISE FRE: python scripts/db_inspector.py fre-analysis <ano>")
-        print("
-Executando inspeção padrão para PETR4 (9512)...")
+        print("Executando inspeção padrão para PETR4 (9512)...")
         inspect_company_data("9512")
