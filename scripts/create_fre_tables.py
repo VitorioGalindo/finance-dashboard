@@ -1,59 +1,75 @@
 # scripts/create_fre_tables.py
 import os
 import sys
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 import logging
 
-# Adiciona o diretório raiz ao path para permitir a importação de módulos
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from scraper.config import DATABASE_URL
-from scraper.models import Base  # Importar a Base é crucial, pois ela contém os metadados das tabelas
+from scraper.models import Base
 
-# Configuração do logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def create_fre_related_tables():
+def update_database_schema():
     """
-    Cria as tabelas 'capital_structure' and 'shareholders' se elas ainda não existirem.
+    Verifica e cria/altera todas as tabelas e colunas necessárias para os dados do FRE.
+    - Cria as tabelas: 'capital_structure', 'shareholders', 'company_administrators', 'company_risk_factors'.
+    - Adiciona colunas à tabela 'companies'.
     """
-    logger.info("Iniciando a verificação e criação das tabelas relacionadas ao FRE...")
+    logger.info("Iniciando a verificação e atualização completa do esquema do banco de dados para o FRE...")
     
     engine = create_engine(DATABASE_URL)
     inspector = inspect(engine)
     
-    # Lista das novas tabelas que queremos criar
-    tables_to_create = ['capital_structure', 'shareholders']
+    # --- 1. Verificação e Criação de Novas Tabelas ---
     
-    # Pega os nomes das tabelas que já existem no banco de dados
-    existing_tables = inspector.get_table_names()
+    all_model_tables = set(Base.metadata.tables.keys())
+    existing_tables = set(inspector.get_table_names())
     
-    # Filtra a lista de tabelas para criar apenas as que não existem
-    tables_needing_creation = [
-        table_name for table_name in tables_to_create if table_name not in existing_tables
+    tables_to_create = [
+        Base.metadata.tables[name] 
+        for name in all_model_tables 
+        if name not in existing_tables
     ]
     
-    if not tables_needing_creation:
-        logger.info("Todas as tabelas relacionadas ao FRE ('capital_structure', 'shareholders') já existem.")
-        return
+    if tables_to_create:
+        logger.info(f"As seguintes tabelas serão criadas: {[t.name for t in tables_to_create]}")
+        try:
+            Base.metadata.create_all(bind=engine, tables=tables_to_create)
+            logger.info("Novas tabelas criadas com sucesso!")
+        except Exception as e:
+            logger.error(f"Ocorreu um erro durante a criação de novas tabelas: {e}")
+            return
+    else:
+        logger.info("Nenhuma nova tabela precisa ser criada. Todas já existem.")
 
-    logger.info(f"As seguintes tabelas serão criadas: {', '.join(tables_needing_creation)}")
+    # --- 2. Verificação e Adição de Novas Colunas à Tabela 'companies' ---
+
+    company_columns_to_add = {
+        'activity_description': 'TEXT',
+        'capital_structure_summary': 'JSON'
+    }
     
-    try:
-        # A mágica do SQLAlchemy: `Base.metadata.create_all` é idempotente.
-        # Ele verifica a existência de cada tabela antes de tentar criá-la.
-        # Passamos a lista de tabelas para garantir que só estamos criando o que queremos.
-        tables_to_create_objects = [
-            Base.metadata.tables[name] for name in tables_needing_creation
-        ]
-        Base.metadata.create_all(bind=engine, tables=tables_to_create_objects)
-        
-        logger.info("Tabelas criadas com sucesso!")
-        
-    except Exception as e:
-        logger.error(f"Ocorreu um erro durante a criação das tabelas: {e}")
-        # Em um cenário de produção, um tratamento de erro mais robusto seria necessário.
+    logger.info("Verificando colunas na tabela 'companies'...")
+    companies_table_columns = [col['name'] for col in inspector.get_columns('companies')]
+    
+    with engine.connect() as connection:
+        for col_name, col_type in company_columns_to_add.items():
+            if col_name not in companies_table_columns:
+                logger.info(f"Adicionando coluna '{col_name}' do tipo {col_type} à tabela 'companies'...")
+                try:
+                    # Usamos `text` para executar o SQL de forma segura
+                    connection.execute(text(f'ALTER TABLE companies ADD COLUMN "{col_name}" {col_type};'))
+                    connection.commit()
+                    logger.info(f"Coluna '{col_name}' adicionada com sucesso.")
+                except Exception as e:
+                    logger.error(f"Falha ao adicionar a coluna '{col_name}': {e}")
+                    connection.rollback()
+            else:
+                logger.info(f"Coluna '{col_name}' já existe na tabela 'companies'.")
+
+    logger.info("Atualização do esquema do banco de dados concluída com sucesso!")
 
 if __name__ == "__main__":
-    create_fre_related_tables()
+    update_database_schema()
