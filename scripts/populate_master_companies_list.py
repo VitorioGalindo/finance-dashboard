@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-# Adiciona a pasta 'scraper' ao path para que possamos importar seus modelos
+# Adiciona a pasta 'scraper' ao path para importar seus modelos
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scraper')))
 from models import Base, Company
 
@@ -30,7 +30,7 @@ def normalize_company_name(name):
     if not isinstance(name, str):
         return ""
     name = re.sub(r'\s+S\.A\.|\s+S/A|\s+SA', '', name, flags=re.IGNORECASE)
-    name = re.sub(r'\s+HOLDING|\s+PARTICIPACOES', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'\s+HOLDING|\s+PARTICIPACOES|\s+PART', '', name, flags=re.IGNORECASE)
     return name.strip().upper()
 
 def get_reference_list():
@@ -478,19 +478,21 @@ def run_etl():
         
         df_enriched = df_merged.dropna(subset=['CNPJ_CIA', 'CD_CVM']).copy()
         
-        print("Agrupando tickers e garantindo unicidade por empresa...")
+        # --- CORREÇÃO: GARANTIR UNICIDADE POR CNPJ ---
+        print("Agrupando tickers e garantindo unicidade por empresa (CNPJ)...")
         
+        df_enriched['CNPJ_CIA_cleaned'] = df_enriched['CNPJ_CIA'].str.replace(r'\D', '', regex=True)
         df_enriched['CD_CVM'] = pd.to_numeric(df_enriched['CD_CVM'], errors='coerce')
-        df_final = df_enriched.dropna(subset=['CD_CVM'])
+        df_final = df_enriched.dropna(subset=['CD_CVM', 'CNPJ_CIA_cleaned'])
         df_final['CD_CVM'] = df_final['CD_CVM'].astype(int)
 
         agg_funcs = {
             'Ticker': lambda x: list(x.unique()),
             'Nome': 'first',
             'DENOM_SOCIAL': 'first',
-            'CNPJ_CIA': 'first',
+            'CD_CVM': 'first'
         }
-        df_final_agg = df_final.groupby('CD_CVM').agg(agg_funcs).reset_index()
+        df_final_agg = df_final.groupby('CNPJ_CIA_cleaned').agg(agg_funcs).reset_index()
 
         print(f"{len(df_final_agg)} empresas únicas foram encontradas e enriquecidas.")
 
@@ -502,13 +504,11 @@ def run_etl():
         
         companies_to_load = []
         for _, row in df_final_agg.iterrows():
-            cnpj_cleaned = ''.join(filter(str.isdigit, row['CNPJ_CIA']))
-            
             companies_to_load.append({
+                'cnpj': row['CNPJ_CIA_cleaned'],
                 'cvm_code': row['CD_CVM'],
                 'company_name': row['DENOM_SOCIAL'],
                 'trade_name': row['Nome'],
-                'cnpj': cnpj_cleaned,
                 'is_b3_listed': True,
                 'tickers': row['Ticker']
             })
