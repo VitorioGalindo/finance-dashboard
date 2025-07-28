@@ -22,8 +22,7 @@ def audit_fre_tables():
     
     with Session() as session:
         # 1. Contagem de registros nas novas tabelas
-        print("
-[1] Contagem de Registros nas Novas Tabelas:")
+        print("[1] Contagem de Registros nas Novas Tabelas:")
         
         capital_count = session.query(func.count(CapitalStructure.id)).scalar()
         print(f"  - Tabela 'capital_structure': {capital_count:,} registros encontrados.")
@@ -38,8 +37,7 @@ def audit_fre_tables():
         print(f"  - Tabela 'company_risk_factors': {risk_count:,} registros encontrados.")
 
         # 2. Verificação das novas colunas na tabela 'companies'
-        print("
-[2] Verificação das Novas Colunas na Tabela 'companies':")
+        print("[2] Verificação das Novas Colunas na Tabela 'companies':")
         
         total_companies = session.query(func.count(Company.id)).scalar()
         
@@ -51,8 +49,7 @@ def audit_fre_tables():
         capital_summary_count = session.query(func.count(Company.id)).filter(Company.capital_structure_summary.isnot(None)).scalar()
         print(f"  - Coluna 'capital_structure_summary': {capital_summary_count} de {total_companies} empresas preenchidas.")
 
-        print("
---- ANÁLISE DA AUDITORIA ---")
+        print("--- ANÁLISE DA AUDITORIA ---")
         if capital_count > 0 and shareholder_count > 0:
             print("✅ SUCESSO: As tabelas 'capital_structure' e 'shareholders' foram populadas com sucesso.")
         else:
@@ -64,8 +61,7 @@ def audit_fre_tables():
         else:
             print("⚠️ AVISO: As tabelas 'company_administrators' ou 'company_risk_factors' contêm dados, o que não era esperado.")
 
-        print("
---- AUDITORIA CONCLUÍDA ---")
+        print("--- AUDITORIA CONCLUÍDA ---")
 
 if __name__ == '__main__':
     audit_fre_tables()
