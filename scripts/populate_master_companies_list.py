@@ -1,4 +1,4 @@
-# scripts/populate_master_companies_list.py (Versão Final e Corrigida)
+# scripts/populate_master_companies_list.py (Com a lista de referência completa)
 import os
 import sys
 import re
@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-# Adiciona a pasta 'scraper' ao path para importar seus modelos
+# Adiciona a pasta 'scraper' ao path para que possamos importar seus modelos
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scraper')))
 from models import Base, Company
 
