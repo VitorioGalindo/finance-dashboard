@@ -27,48 +27,34 @@ class CVMDataCollector:
 
     def _download_and_extract_zip(self, url: str) -> Dict[str, pd.DataFrame]:
         """
-        Baixa um arquivo ZIP, descompacta em memória e lê os CSVs.
-        LOGGING MELHORADO para diagnosticar falhas de download.
+        Baixa um arquivo ZIP e lê os CSVs com tratamento de erro para parsing.
         """
         try:
             logger.info(f"Tentando baixar arquivo de: {url}")
             response = self.session.get(url, timeout=300)
-            response.raise_for_status()  # Isso irá gerar um erro para status 4xx ou 5xx
+            response.raise_for_status()
 
             zip_file = zipfile.ZipFile(BytesIO(response.content))
-            file_list = zip_file.namelist()
-            
-            if not file_list:
-                logger.warning(f"O arquivo ZIP de {url} foi baixado mas está vazio.")
-                return {}
-
-            logger.debug(f"Arquivos encontrados no ZIP: {file_list}")
             dataframes = {}
-            for filename in file_list:
+            for filename in zip_file.namelist():
                 if filename.endswith('.csv'):
                     content = zip_file.read(filename)
-                    df = pd.read_csv(io.BytesIO(content), sep=';', encoding='latin1', dtype=str, low_memory=False)
-                    dataframes[filename] = df
+                    try:
+                        # Tenta com o motor 'c' que é mais rápido
+                        df = pd.read_csv(io.BytesIO(content), sep=';', encoding='latin1', dtype=str, low_memory=False)
+                        dataframes[filename] = df
+                    except pd.errors.ParserError as e:
+                        # Se falhar, tenta com o motor 'python' que é mais robusto
+                        logger.warning(f"Falha no parsing de {filename} com motor 'c': {e}. Tentando com motor 'python'.")
+                        df = pd.read_csv(io.BytesIO(content), sep=';', encoding='latin1', dtype=str, engine='python', on_bad_lines='warn')
+                        dataframes[filename] = df
             
-            if not dataframes:
-                logger.warning(f"ZIP baixado de {url}, mas nenhum arquivo .csv foi encontrado dentro dele.")
-                return {}
-
             logger.info(f"Sucesso ao baixar e extrair de {url}")
             return dataframes
             
         except requests.exceptions.HTTPError as e:
-            # LOG CRÍTICO: Informa o status code do erro.
             if e.response is not None:
                 logger.error(f"ERRO HTTP ao baixar {url}. Status Code: {e.response.status_code}.")
-            else:
-                logger.error(f"ERRO HTTP ao baixar {url}: {e}")
-            return {} # Retorna dicionário vazio em caso de erro HTTP
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Erro de rede (não-HTTP) ao baixar {url}: {e}")
-            return {}
-        except zipfile.BadZipFile:
-            logger.error(f"Erro: O arquivo baixado de {url} não é um ZIP válido.")
             return {}
         except Exception as e:
             logger.error(f"Erro inesperado ao processar {url}: {e}", exc_info=True)
@@ -78,10 +64,6 @@ class CVMDataCollector:
         """Busca um mapa de CNPJ para company_id."""
         companies = session.query(Company.id, Company.cnpj).all()
         return {cnpj.replace(r'\D', ''): company_id for company_id, cnpj in companies}
-
-    def process_financial_statements(self, doc_type: str, year: int):
-        # ... (código existente)
-        pass
 
     def _process_capital_structure(self, session, dataframes: Dict[str, pd.DataFrame], company_map: Dict[str, int], year: int):
         logger.info("--- Processando Estrutura de Capital ---")
@@ -111,13 +93,16 @@ class CVMDataCollector:
         df_capital.dropna(subset=['company_id'], inplace=True)
         df_capital['company_id'] = df_capital['company_id'].astype(int)
 
-        records_to_save = [CapitalStructure(**row) for row in df_capital.to_dict(orient='records') if 'company_id' in row and row['company_id']]
+        # **CORREÇÃO**: Selecionar apenas as colunas que o modelo CapitalStructure espera
+        model_columns = [c.name for c in CapitalStructure.__table__.columns if c.name != 'id' and c.name != 'created_at']
+        df_to_save = df_capital[model_columns]
+
+        records_to_save = df_to_save.to_dict(orient='records')
 
         if records_to_save:
             logger.info(f"Salvando {len(records_to_save)} registros de estrutura de capital...")
-            date_to_delete = datetime(year, 1, 1)
             session.query(CapitalStructure).filter(extract('year', CapitalStructure.approval_date) == year).delete(synchronize_session=False)
-            session.bulk_save_objects(records_to_save)
+            session.bulk_insert_mappings(CapitalStructure, records_to_save)
             logger.info("Registros de estrutura de capital salvos.")
 
     def _process_shareholders(self, session, dataframes: Dict[str, pd.DataFrame], company_map: Dict[str, int], year: int):
@@ -142,18 +127,22 @@ class CVMDataCollector:
         
         numeric_cols = ['pct_ordinary_shares', 'pct_preferred_shares']
         for col in numeric_cols:
-            df_shareholders[col] = pd.to_numeric(df_shareholders[col], errors='coerce')
+            df_shareholders[col] = pd.to_numeric(df_shareholders[col].str.replace(',', '.'), errors='coerce')
             
         df_shareholders['company_id'] = df_shareholders['cnpj'].map(company_map)
         df_shareholders.dropna(subset=['company_id', 'reference_date'], inplace=True)
         df_shareholders['company_id'] = df_shareholders['company_id'].astype(int)
-        
-        records_to_save = [Shareholder(**row) for row in df_shareholders.to_dict(orient='records') if 'company_id' in row and row['company_id']]
+
+        # **CORREÇÃO**: Selecionar apenas as colunas que o modelo Shareholder espera
+        model_columns = [c.name for c in Shareholder.__table__.columns if c.name != 'id' and c.name != 'created_at']
+        df_to_save = df_shareholders[model_columns]
+
+        records_to_save = df_to_save.to_dict(orient='records')
 
         if records_to_save:
             logger.info(f"Salvando {len(records_to_save)} registros de acionistas...")
             session.query(Shareholder).filter(extract('year', Shareholder.reference_date) == year).delete(synchronize_session=False)
-            session.bulk_save_objects(records_to_save)
+            session.bulk_insert_mappings(Shareholder, records_to_save)
             logger.info("Registros de acionistas salvos.")
 
     def process_fre_data(self, year: int):
@@ -176,5 +165,23 @@ class CVMDataCollector:
         current_year = datetime.now().year
         for year in range(START_YEAR_HISTORICAL_LOAD, current_year + 1):
             self.process_fre_data(year)
-            time.sleep(2) # Pausa amigável
+            time.sleep(2)
         logger.info("--- Carga histórica de dados do FRE concluída ---")
+        
+    def run_historical_financial_load(self):
+        """
+        Executa a carga histórica completa para DFP e ITR.
+        """
+        current_year = datetime.now().year
+        for year in range(START_YEAR_HISTORICAL_LOAD, current_year + 1):
+            for doc_type in ['DFP', 'ITR']:
+                logger.info(f"--- Processando {doc_type} para o ano de {year} ---")
+                try:
+                    self.process_financial_statements(doc_type, year)
+                except Exception as e:
+                    logger.error(f"Erro fatal ao processar {doc_type} para {year}: {e}", exc_info=True)
+                # Pausa para não sobrecarregar o servidor da CVM
+                time.sleep(2)
+        logger.info("--- Carga histórica de demonstrativos financeiros concluída ---")
+    
+    # ... (restante da classe, incluindo process_financial_statements)
