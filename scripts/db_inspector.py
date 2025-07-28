@@ -48,8 +48,7 @@ def inspect_company_data(cvm_code_to_inspect: str):
         # latest_annual_report é uma tupla (Row), o objeto está no primeiro elemento
         report = latest_annual_report[0]
         
-        print(f"
---- Inspecionando o relatório de {report.reference_date.strftime('%Y-%m-%d')} (Versão: {report.version}) ---")
+        print(f"--- Inspecionando o relatório de {report.reference_date.strftime('%Y-%m-%d')} (Versão: {report.version}) ---")
 
         # 3. Carregar o campo 'data' que contém todos os dados financeiros
         financial_data = report.data
@@ -61,8 +60,7 @@ def inspect_company_data(cvm_code_to_inspect: str):
         print(f"O relatório contém {len(financial_data)} contas (linhas) diferentes.")
 
         # 4. Exibir exemplos de contas-chave de cada demonstrativo
-        print("
---- AMOSTRA DE DADOS ---")
+        print("--- AMOSTRA DE DADOS ---")
         
         # Mapeamento de algumas contas importantes para verificação
         key_accounts = {
@@ -103,13 +101,11 @@ def inspect_company_data(cvm_code_to_inspect: str):
                     print(f"  - {description} (Conta {code}): Não encontrado")
 
         if not found_any_key:
-            print("
-AVISO: Nenhuma das contas-chave de exemplo foi encontrada. O plano de contas pode ser diferente.")
+            print("AVISO: Nenhuma das contas-chave de exemplo foi encontrada. O plano de contas pode ser diferente.")
             print("Abaixo, uma amostra bruta do JSON para análise:")
             print(json.dumps({k: v for i, (k, v) in enumerate(financial_data.items()) if i < 10}, indent=2))
             
-        print("
---- INSPEÇÃO CONCLUÍDA ---")
+        print("--- INSPEÇÃO CONCLUÍDA ---")
 
 
 if __name__ == '__main__':
