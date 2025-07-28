@@ -76,8 +76,7 @@ def analyze_fre_zip_structure(year: int):
         print("❌ ERRO: O arquivo baixado não é um ZIP válido.")
         return
         
-    print("
---- ANÁLISE ESTRUTURAL DO FRE CONCLUÍDA ---")
+    print("--- ANÁLISE ESTRUTURAL DO FRE CONCLUÍDA ---")
     propose_db_schema()
 
 def propose_db_schema():
