@@ -1,7 +1,6 @@
-# scripts/populate_master_companies_list.py (Com a lista de referência completa)
+# scripts/populate_master_companies_list.py (Versão Profissional de Enriquecimento)
 import os
 import sys
-import re
 import pandas as pd
 import requests
 import zipfile
@@ -9,8 +8,9 @@ import io
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from datetime import datetime
 
-# Adiciona a pasta 'scraper' ao path para que possamos importar seus modelos
+# Adiciona a pasta 'scraper' ao path para importar o modelo de dados
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scraper')))
 from models import Base, Company
 
@@ -25,17 +25,9 @@ def get_db_connection_string():
         raise ValueError("Credenciais do banco de dados não encontradas.")
     return f"postgresql+psycopg2://{user}:{password}@{host}/{dbname}?sslmode=require"
 
-def normalize_company_name(name):
-    """Limpa e padroniza o nome de uma empresa para facilitar a correspondência."""
-    if not isinstance(name, str):
-        return ""
-    name = re.sub(r'\s+S\.A\.|\s+S/A|\s+SA', '', name, flags=re.IGNORECASE)
-    name = re.sub(r'\s+HOLDING|\s+PARTICIPACOES|\s+PART', '', name, flags=re.IGNORECASE)
-    return name.strip().upper()
-
-def get_reference_list():
-    """Carrega a lista de tickers e nomes fornecida como um DataFrame."""
-    print("Carregando a lista de referência de empresas...")
+def get_reference_tickers():
+    """Carrega apenas o conjunto de tickers da lista de referência."""
+    print("Carregando a lista de tickers de referência...")
     csv_data = """"Ticker","Nome"
 "BBAS3","Banco do Brasil"
 "AZUL4","Azul"
@@ -434,30 +426,43 @@ def get_reference_list():
 "MRSA6B","MRS Logística"
 "CEEB5","COELBA"
 """
-    
     df = pd.read_csv(io.StringIO(csv_data))
-    df['normalized_name'] = df['Nome'].apply(normalize_company_name)
-    print(f"Carregadas {len(df)} empresas da lista de referência.")
-    return df
+    tickers_set = set(df['Ticker'].str.upper())
+    print(f"Carregados {len(tickers_set)} tickers únicos de referência.")
+    return tickers_set
 
-def get_cvm_master_data():
-    """Baixa e processa o arquivo de cadastro da CVM."""
-    print("Baixando dados cadastrais da CVM...")
-    url = "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
+def get_cvm_data():
+    """Baixa e processa os arquivos de cadastro e valores mobiliários da CVM."""
+    print("Baixando dados cadastrais da CVM (cad_cia_aberta.csv)...")
     try:
-        response = requests.get(url, timeout=60)
-        response.raise_for_status()
-        cvm_data = pd.read_csv(io.StringIO(response.content.decode('latin-1')), sep=';', dtype=str)
-        cvm_data['normalized_name_cvm'] = cvm_data['DENOM_SOCIAL'].apply(normalize_company_name)
-        print("Dados da CVM processados.")
-        return cvm_data
+        url_cad = "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
+        res_cad = requests.get(url_cad, timeout=60)
+        res_cad.raise_for_status()
+        df_cad = pd.read_csv(io.StringIO(res_cad.content.decode('latin-1')), sep=';', dtype=str)
+        df_cad['CNPJ_CIA_cleaned'] = df_cad['CNPJ_CIA'].str.replace(r'\D', '', regex=True)
+        print("Dados cadastrais baixados.")
+
+        print("Baixando dados de valores mobiliários da CVM (FCA)...")
+        year = datetime.now().year
+        url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
+        res_fca = requests.get(url_fca, timeout=120)
+        res_fca.raise_for_status()
+        zip_buffer = io.BytesIO(res_fca.content)
+        with zipfile.ZipFile(zip_buffer) as z:
+            file_name = f"fca_cia_aberta_valor_mobiliario_{year}.csv"
+            with z.open(file_name) as f:
+                df_fca = pd.read_csv(f, sep=';', encoding='latin-1', dtype=str)
+        df_fca['CNPJ_CIA_cleaned'] = df_fca['CNPJ_CIA'].str.replace(r'\D', '', regex=True)
+        print("Dados de valores mobiliários baixados.")
+        
+        return df_cad, df_fca
     except Exception as e:
-        print(f"ERRO ao baixar ou processar dados da CVM: {e}")
-        return pd.DataFrame()
+        print(f"❌ ERRO ao baixar dados da CVM: {e}")
+        return pd.DataFrame(), pd.DataFrame()
 
 def run_etl():
     """Orquestra o processo de ETL para criar a lista mestra de empresas."""
-    print("--- INICIANDO ETL DA LISTA MESTRA DE EMPRESAS ---")
+    print("--- INICIANDO ETL DA LISTA MESTRA DE EMPRESAS (VERSÃO 2.0) ---")
     
     engine = create_engine(get_db_connection_string())
     Session = sessionmaker(bind=engine)
@@ -465,34 +470,35 @@ def run_etl():
 
     try:
         # FASE 1: EXTRAÇÃO
-        df_reference = get_reference_list()
-        df_cvm = get_cvm_master_data()
+        reference_tickers = get_reference_tickers()
+        df_cad, df_fca = get_cvm_data()
 
-        if df_reference.empty or df_cvm.empty:
-            print("Não foi possível obter os dados de referência ou da CVM. Abortando.")
+        if df_cad.empty or df_fca.empty:
+            print("Não foi possível obter os dados da CVM. Abortando.")
             return
 
         # FASE 2: TRANSFORMAÇÃO (ENRIQUECIMENTO)
         print("Enriquecendo dados com informações da CVM...")
-        df_merged = pd.merge(df_reference, df_cvm, left_on='normalized_name', right_on='normalized_name_cvm', how='left')
         
-        df_enriched = df_merged.dropna(subset=['CNPJ_CIA', 'CD_CVM']).copy()
+        df_fca_filtered = df_fca[df_fca['CODIGO_NEGOCIACAO'].str.upper().isin(reference_tickers)]
         
-        # --- CORREÇÃO: GARANTIR UNICIDADE POR CNPJ ---
-        print("Agrupando tickers e garantindo unicidade por empresa (CNPJ)...")
+        df_merged = pd.merge(
+            df_cad,
+            df_fca_filtered[['CNPJ_CIA_cleaned', 'CODIGO_NEGOCIACAO']],
+            on='CNPJ_CIA_cleaned',
+            how='inner'
+        )
         
-        df_enriched['CNPJ_CIA_cleaned'] = df_enriched['CNPJ_CIA'].str.replace(r'\D', '', regex=True)
-        df_enriched['CD_CVM'] = pd.to_numeric(df_enriched['CD_CVM'], errors='coerce')
-        df_final = df_enriched.dropna(subset=['CD_CVM', 'CNPJ_CIA_cleaned'])
-        df_final['CD_CVM'] = df_final['CD_CVM'].astype(int)
-
+        print("Agrupando tickers por empresa...")
         agg_funcs = {
-            'Ticker': lambda x: list(x.unique()),
-            'Nome': 'first',
+            'CODIGO_NEGOCIACAO': lambda x: sorted(list(x.unique())),
             'DENOM_SOCIAL': 'first',
-            'CD_CVM': 'first'
+            'CD_CVM': 'first',
+            'SETOR_ATIV': 'first',
+            'ATIV_PRINC': 'first',
+            'PAG_WEB': 'first'
         }
-        df_final_agg = df_final.groupby('CNPJ_CIA_cleaned').agg(agg_funcs).reset_index()
+        df_final_agg = df_merged.groupby('CNPJ_CIA_cleaned').agg(agg_funcs).reset_index()
 
         print(f"{len(df_final_agg)} empresas únicas foram encontradas e enriquecidas.")
 
@@ -506,11 +512,14 @@ def run_etl():
         for _, row in df_final_agg.iterrows():
             companies_to_load.append({
                 'cnpj': row['CNPJ_CIA_cleaned'],
-                'cvm_code': row['CD_CVM'],
+                'cvm_code': int(row['CD_CVM']),
                 'company_name': row['DENOM_SOCIAL'],
-                'trade_name': row['Nome'],
+                'trade_name': row['DENOM_SOCIAL'], # Usando o nome social como fallback
                 'is_b3_listed': True,
-                'tickers': row['Ticker']
+                'tickers': row['CODIGO_NEGOCIACAO'],
+                'b3_sector': row.get('SETOR_ATIV'),
+                'main_activity': row.get('ATIV_PRINC'),
+                'website': row.get('PAG_WEB')
             })
         
         if companies_to_load:
