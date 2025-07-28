@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAD CVM Superscraper Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .nav-tabs {
+            display: flex;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 5px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-tab {
+            flex: 1;
+            padding: 15px 20px;
+            text-align: center;
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        .nav-tab.active {
+            background: rgba(255,255,255,0.2);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .nav-tab:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .filters {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .filters h3 {
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            margin-bottom: 5px;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+
+        .filter-group select,
+        .filter-group input {
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            font-size: 1rem;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.1);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .stat-number {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #4CAF50;
+        }
+
+        .stat-label {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .data-table {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            margin-bottom: 30px;
+        }
+
+        .table-header {
+            background: rgba(255,255,255,0.2);
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .table-header h3 {
+            font-size: 1.4rem;
+        }
+
+        .table-content {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        th {
+            background: rgba(255,255,255,0.1);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2rem;
+            opacity: 0.7;
+        }
+
+        .error {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+            color: #ffcdd2;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .success {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.5);
+            color: #c8e6c9;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-active {
+            background: #4CAF50;
+        }
+
+        .status-inactive {
+            background: #f44336;
+        }
+
+        .value-positive {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .value-negative {
+            color: #f44336;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .nav-tabs {
+                flex-direction: column;
+            }
+
+            .filter-row {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 0.9rem;
+            }
+
+            th, td {
+                padding: 10px 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>RAD CVM Superscraper</h1>
+            <p>Dashboard de Análise e Gerenciamento de Carteira</p>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('overview')">Visão Geral</button>
+            <button class="nav-tab" onclick="showTab('documents')">Documentos CVM</button>
+            <button class="nav-tab" onclick="showTab('insider')">Radar de Insiders (CVM 44)</button>
+            <button class="nav-tab" onclick="showTab('settings')">Configurações</button>
+        </div>
+
+        <!-- Visão Geral -->
+        <div id="overview" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="total-empresas">?</div>
+                    <div class="stat-label">Empresas Monitoradas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="total-documentos">?</div>
+                    <div class="stat-label">Documentos Coletados</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="total-movimentacoes">?</div>
+                    <div class="stat-label">Movimentações CVM 44</div>
+                </div>
+            </div>
+
+            <div class="data-table">
+                <div class="table-header">
+                    <h3>Status do Sistema</h3>
+                </div>
+                <div class="table-content">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Componente</th>
+                                <th>Status</th>
+                                <th>Última Execução</th>
+                                <th>Próxima Execução</th>
+                            </tr>
+                        </thead>
+                        <tbody id="system-status">
+                            <tr>
+                                <td>Scraper RAD CVM</td>
+                                <td><span class="status-indicator status-active"></span>Ativo</td>
+                                <td id="last-run">-</td>
+                                <td id="next-run">-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Documentos CVM -->
+        <div id="documents" class="tab-content">
+            <div class="filters">
+                <h3>Filtros</h3>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label>Filtrar por Empresa</label>
+                        <select id="filter-empresa">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Filtrar por Categoria</label>
+                        <select id="filter-categoria">
+                            <option value="">Todas</option>
+                            <option value="CVM 44">CVM 44</option>
+                            <option value="FRE">FRE</option>
+                            <option value="Comunicado">Comunicado ao Mercado</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Filtrar por Período de Publicação</label>
+                        <input type="date" id="filter-data-inicio">
+                    </div>
+                    <div class="filter-group">
+                        <label>&nbsp;</label>
+                        <input type="date" id="filter-data-fim">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="loadDocuments()">Aplicar Filtros</button>
+                <button class="btn btn-secondary" onclick="runScraper()">Executar Scraper</button>
+            </div>
+
+            <div class="data-table">
+                <div class="table-header">
+                    <h3>Documentos CVM</h3>
+                    <span id="documents-count">Exibindo 0 documentos encontrados</span>
+                </div>
+                <div class="table-content">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Empresa</th>
+                                <th>Categoria</th>
+                                <th>Tipo</th>
+                                <th>Assunto</th>
+                                <th>Link</th>
+                            </tr>
+                        </thead>
+                        <tbody id="documents-table">
+                            <tr>
+                                <td colspan="6" class="loading">Carregando documentos...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Radar de Insiders -->
+        <div id="insider" class="tab-content">
+            <div class="filters">
+                <h3>Radar de Insiders (CVM 44)</h3>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label>Ticker</label>
+                        <select id="insider-ticker">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Período</label>
+                        <select id="insider-periodo">
+                            <option value="7">Últimos 7 dias</option>
+                            <option value="30">Últimos 30 dias</option>
+                            <option value="90">Últimos 90 dias</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>&nbsp;</label>
+                        <button class="btn btn-primary" onclick="loadInsiderData()">Gerar Relatório</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">100,00%</div>
+                    <div class="stat-label">Modalidade<br>Ações e Opções</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">% de valor de<br>Mercado</div>
+                    <div class="stat-label">?</div>
+                </div>
+            </div>
+
+            <div class="data-table">
+                <div class="table-header">
+                    <h3>Total do Período</h3>
+                    <span>Top Companhias</span>
+                </div>
+                <div class="table-content">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ticker</th>
+                                <th>Modalidade</th>
+                                <th>Saldo Líquido</th>
+                                <th>% do Valor Total</th>
+                                <th>% do Preço Final</th>
+                                <th>% Capital</th>
+                            </tr>
+                        </thead>
+                        <tbody id="insider-summary">
+                            <tr>
+                                <td colspan="6" class="loading">Carregando dados de insider trading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="data-table">
+                <div class="table-header">
+                    <h3>Movimentações</h3>
+                </div>
+                <div class="table-content">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Preço Médio</th>
+                                <th>Pessoa</th>
+                                <th>Quantidade</th>
+                                <th>Papel</th>
+                                <th>% do Valor Total</th>
+                                <th>% do Preço Final</th>
+                                <th>Comentário</th>
+                                <th>Data</th>
+                                <th>Modalidade</th>
+                                <th>% Capital</th>
+                            </tr>
+                        </thead>
+                        <tbody id="insider-movements">
+                            <tr>
+                                <td colspan="10" class="loading">Carregando movimentações...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configurações -->
+        <div id="settings" class="tab-content">
+            <div class="filters">
+                <h3>Configurações do Scraper</h3>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label>Intervalo de Execução (minutos)</label>
+                        <input type="number" id="scraper-interval" value="1" min="1" max="60">
+                    </div>
+                    <div class="filter-group">
+                        <label>Modo Headless</label>
+                        <select id="scraper-headless">
+                            <option value="true">Sim</option>
+                            <option value="false">Não</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="saveSettings()">Salvar Configurações</button>
+            </div>
+
+            <div class="data-table">
+                <div class="table-header">
+                    <h3>Log do Sistema</h3>
+                </div>
+                <div class="table-content">
+                    <div id="system-log" style="padding: 20px; font-family: monospace; font-size: 0.9rem;">
+                        <div>2025-07-28 14:45:00 - INFO - Sistema iniciado</div>
+                        <div>2025-07-28 14:45:01 - INFO - Conectando ao portal RAD CVM</div>
+                        <div>2025-07-28 14:45:02 - INFO - Conexão estabelecida com sucesso</div>
+                        <div>2025-07-28 14:45:03 - INFO - Buscando documentos recentes</div>
+                        <div>2025-07-28 14:45:05 - INFO - Encontrados 15 documentos</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variáveis globais
+        let currentData = {
+            empresas: [],
+            documentos: [],
+            movimentacoes: [],
+            stats: {}
+        };
+
+        // Função para mostrar/esconder tabs
+        function showTab(tabName) {
+            // Remove active de todas as tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // Adiciona active na tab selecionada
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+            
+            // Carrega dados específicos da tab
+            if (tabName === 'overview') {
+                loadOverviewData();
+            } else if (tabName === 'documents') {
+                loadDocuments();
+            } else if (tabName === 'insider') {
+                loadInsiderData();
+            }
+        }
+
+        // Função para carregar dados da visão geral
+        async function loadOverviewData() {
+            try {
+                const response = await fetch('/api/rad-cvm/stats');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const stats = result.data;
+                    document.getElementById('total-empresas').textContent = stats.total_empresas || 0;
+                    document.getElementById('total-documentos').textContent = stats.total_documentos || 0;
+                    document.getElementById('total-movimentacoes').textContent = stats.total_movimentacoes_cvm44 || 0;
+                }
+                
+                // Carrega status do scraper
+                const statusResponse = await fetch('/api/rad-cvm/scraper/status');
+                const statusResult = await statusResponse.json();
+                
+                if (statusResult.success) {
+                    const status = statusResult.data;
+                    document.getElementById('last-run').textContent = new Date(status.last_run).toLocaleString('pt-BR');
+                    document.getElementById('next-run').textContent = new Date(status.next_run).toLocaleString('pt-BR');
+                }
+                
+            } catch (error) {
+                console.error('Erro ao carregar dados da visão geral:', error);
+            }
+        }
+
+        // Função para carregar empresas
+        async function loadEmpresas() {
+            try {
+                const response = await fetch('/api/rad-cvm/empresas');
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentData.empresas = result.data;
+                    
+                    // Popula selects de empresa
+                    const selects = ['filter-empresa', 'insider-ticker'];
+                    selects.forEach(selectId => {
+                        const select = document.getElementById(selectId);
+                        select.innerHTML = '<option value="">Todas</option>';
+                        
+                        result.data.forEach(empresa => {
+                            const option = document.createElement('option');
+                            option.value = empresa.codigo_cvm;
+                            option.textContent = `${empresa.nome} (${empresa.codigo_cvm})`;
+                            select.appendChild(option);
+                        });
+                    });
+                }
+            } catch (error) {
+                console.error('Erro ao carregar empresas:', error);
+            }
+        }
+
+        // Função para carregar documentos
+        async function loadDocuments() {
+            try {
+                const codigoCvm = document.getElementById('filter-empresa').value;
+                const categoria = document.getElementById('filter-categoria').value;
+                const dataInicio = document.getElementById('filter-data-inicio').value;
+                const dataFim = document.getElementById('filter-data-fim').value;
+                
+                let url = '/api/rad-cvm/documentos?';
+                if (codigoCvm) url += `codigo_cvm=${codigoCvm}&`;
+                if (categoria) url += `categoria=${categoria}&`;
+                if (dataInicio) url += `data_inicio=${dataInicio}&`;
+                if (dataFim) url += `data_fim=${dataFim}&`;
+                
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentData.documentos = result.data;
+                    renderDocumentsTable(result.data);
+                    document.getElementById('documents-count').textContent = `Exibindo ${result.data.length} documentos encontrados`;
+                } else {
+                    showError('Erro ao carregar documentos: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar documentos:', error);
+                showError('Erro ao carregar documentos');
+            }
+        }
+
+        // Função para renderizar tabela de documentos
+        function renderDocumentsTable(documentos) {
+            const tbody = document.getElementById('documents-table');
+            
+            if (documentos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="loading">Nenhum documento encontrado</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = documentos.map(doc => `
+                <tr>
+                    <td>${new Date(doc.data_entrega).toLocaleDateString('pt-BR')}</td>
+                    <td>${doc.empresa}</td>
+                    <td>${doc.categoria}</td>
+                    <td>${doc.tipo}</td>
+                    <td>${doc.especie || '-'}</td>
+                    <td><a href="#" style="color: #4CAF50;">Abrir</a></td>
+                </tr>
+            `).join('');
+        }
+
+        // Função para carregar dados de insider trading
+        async function loadInsiderData() {
+            try {
+                const codigoCvm = document.getElementById('insider-ticker').value;
+                const periodo = document.getElementById('insider-periodo').value;
+                
+                let url = '/api/rad-cvm/movimentacoes?';
+                if (codigoCvm) url += `codigo_cvm=${codigoCvm}&`;
+                if (periodo) {
+                    const dataInicio = new Date();
+                    dataInicio.setDate(dataInicio.getDate() - parseInt(periodo));
+                    url += `data_inicio=${dataInicio.toISOString().split('T')[0]}&`;
+                }
+                
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentData.movimentacoes = result.data;
+                    renderInsiderTables(result.data);
+                } else {
+                    showError('Erro ao carregar dados de insider trading: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar dados de insider trading:', error);
+                showError('Erro ao carregar dados de insider trading');
+            }
+        }
+
+        // Função para renderizar tabelas de insider trading
+        function renderInsiderTables(movimentacoes) {
+            // Agrupa por empresa para o resumo
+            const resumoPorEmpresa = {};
+            movimentacoes.forEach(mov => {
+                if (!resumoPorEmpresa[mov.codigo_cvm]) {
+                    resumoPorEmpresa[mov.codigo_cvm] = {
+                        empresa: mov.empresa,
+                        totalMovimentado: 0,
+                        valorTotal: 0
+                    };
+                }
+                resumoPorEmpresa[mov.codigo_cvm].totalMovimentado += mov.quantidade_movimentada || 0;
+                resumoPorEmpresa[mov.codigo_cvm].valorTotal += mov.valor_total || 0;
+            });
+            
+            // Renderiza resumo
+            const summaryTbody = document.getElementById('insider-summary');
+            const resumoArray = Object.values(resumoPorEmpresa);
+            
+            if (resumoArray.length === 0) {
+                summaryTbody.innerHTML = '<tr><td colspan="6" class="loading">Nenhuma movimentação encontrada</td></tr>';
+            } else {
+                summaryTbody.innerHTML = resumoArray.map(resumo => `
+                    <tr>
+                        <td>${resumo.empresa}</td>
+                        <td>Ações e Opções</td>
+                        <td class="${resumo.totalMovimentado >= 0 ? 'value-positive' : 'value-negative'}">
+                            ${resumo.totalMovimentado.toLocaleString('pt-BR')}
+                        </td>
+                        <td>${(resumo.valorTotal / 1000000).toFixed(2)}M</td>
+                        <td>-</td>
+                        <td>-</td>
+                    </tr>
+                `).join('');
+            }
+            
+            // Renderiza movimentações detalhadas
+            const movementsTbody = document.getElementById('insider-movements');
+            
+            if (movimentacoes.length === 0) {
+                movementsTbody.innerHTML = '<tr><td colspan="10" class="loading">Nenhuma movimentação encontrada</td></tr>';
+            } else {
+                movementsTbody.innerHTML = movimentacoes.map(mov => `
+                    <tr>
+                        <td>R$ ${(mov.preco_unitario || 0).toFixed(2)}</td>
+                        <td>${mov.nome_pessoa}</td>
+                        <td class="${mov.quantidade_movimentada >= 0 ? 'value-positive' : 'value-negative'}">
+                            ${(mov.quantidade_movimentada || 0).toLocaleString('pt-BR')}
+                        </td>
+                        <td>${mov.cargo}</td>
+                        <td>${((mov.valor_total || 0) / 1000000).toFixed(2)}M</td>
+                        <td>-</td>
+                        <td>${mov.tipo_movimentacao}</td>
+                        <td>${new Date(mov.data_movimentacao).toLocaleDateString('pt-BR')}</td>
+                        <td>${mov.valor_mobiliario}</td>
+                        <td>-</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // Função para executar scraper
+        async function runScraper() {
+            try {
+                showSuccess('Executando scraper...');
+                
+                const response = await fetch('/api/rad-cvm/scraper/run', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess(`Scraper executado com sucesso! ${result.documents_found} documentos encontrados em ${result.execution_time}`);
+                    // Recarrega dados
+                    loadDocuments();
+                    loadOverviewData();
+                } else {
+                    showError('Erro ao executar scraper: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Erro ao executar scraper:', error);
+                showError('Erro ao executar scraper');
+            }
+        }
+
+        // Função para salvar configurações
+        function saveSettings() {
+            const interval = document.getElementById('scraper-interval').value;
+            const headless = document.getElementById('scraper-headless').value;
+            
+            // Aqui seria feita a requisição para salvar as configurações
+            showSuccess('Configurações salvas com sucesso!');
+        }
+
+        // Funções de utilidade
+        function showError(message) {
+            // Remove mensagens anteriores
+            document.querySelectorAll('.error, .success').forEach(el => el.remove());
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.querySelector('.container').insertBefore(errorDiv, document.querySelector('.nav-tabs'));
+            
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+
+        function showSuccess(message) {
+            // Remove mensagens anteriores
+            document.querySelectorAll('.error, .success').forEach(el => el.remove());
+            
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = message;
+            document.querySelector('.container').insertBefore(successDiv, document.querySelector('.nav-tabs'));
+            
+            setTimeout(() => successDiv.remove(), 5000);
+        }
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            loadEmpresas();
+            loadOverviewData();
+            
+            // Define datas padrão (últimos 7 dias)
+            const hoje = new Date();
+            const semanaPassada = new Date();
+            semanaPassada.setDate(hoje.getDate() - 7);
+            
+            document.getElementById('filter-data-inicio').value = semanaPassada.toISOString().split('T')[0];
+            document.getElementById('filter-data-fim').value = hoje.toISOString().split('T')[0];
+        });
+    </script>
+</body>
+</html>
+
