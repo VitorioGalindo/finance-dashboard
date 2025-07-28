@@ -90,8 +90,7 @@ def inspect_company_data(cvm_code_to_inspect: str):
         
         found_any_key = False
         for statement_name, accounts in key_accounts.items():
-            print(f"
-[ {statement_name} ]")
+            print(f"[ {statement_name} ]")
             for code, description in accounts.items():
                 value = financial_data.get(code)
                 if value is not None:
