@@ -60,7 +60,6 @@ class CapitalStructure(Base):
     approval_date = Column(DateTime, nullable=False)
     event_type = Column(String(50), nullable=False)
     value = Column(Float)
-    # --- CORREÇÃO: Alterado de Integer para BigInteger ---
     qty_ordinary_shares = Column(BigInteger)
     qty_preferred_shares = Column(BigInteger)
     qty_total_shares = Column(BigInteger)
@@ -91,9 +90,11 @@ class CompanyAdministrator(Base):
     position = Column(String(100))
     role = Column(String(100))
     election_date = Column(DateTime)
-    term_of_office = Column(String(50))
+    # --- CORREÇÃO: Aumentado o tamanho do campo ---
+    term_of_office = Column(String(100))
     professional_background = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
     company = relationship("Company", back_populates="administrators")
 
 class CompanyRiskFactor(Base):
