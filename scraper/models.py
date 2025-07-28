@@ -1,7 +1,7 @@
 # scraper/models.py
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, Boolean, Text, JSON, ForeignKey
+    Column, Integer, String, Float, DateTime, Boolean, Text, JSON, ForeignKey, BigInteger
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -29,10 +29,8 @@ class Company(Base):
     tickers = Column(JSON)
     ticker = Column(String(10))
     is_active = Column(Boolean, default=True)
-    # --- COLUNAS ADICIONADAS DO FRE ---
     activity_description = Column(Text)
     capital_structure_summary = Column(JSON)
-    # --- FIM DAS ADIÇÕES ---
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -62,9 +60,10 @@ class CapitalStructure(Base):
     approval_date = Column(DateTime, nullable=False)
     event_type = Column(String(50), nullable=False)
     value = Column(Float)
-    qty_ordinary_shares = Column(Integer)
-    qty_preferred_shares = Column(Integer)
-    qty_total_shares = Column(Integer)
+    # --- CORREÇÃO: Alterado de Integer para BigInteger ---
+    qty_ordinary_shares = Column(BigInteger)
+    qty_preferred_shares = Column(BigInteger)
+    qty_total_shares = Column(BigInteger)
     created_at = Column(DateTime, default=datetime.utcnow)
     company = relationship("Company", back_populates="capital_events")
 
@@ -82,46 +81,28 @@ class Shareholder(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     company = relationship("Company", back_populates="shareholders")
 
-# --- NOVAS TABELAS ADICIONADAS ---
 class CompanyAdministrator(Base):
-    """
-    Armazena os membros da administração (Conselho, Diretoria, etc).
-    Origem: fre_cia_aberta_administrador_membro_*.csv
-    """
     __tablename__ = 'company_administrators'
     id = Column(Integer, primary_key=True)
     company_id = Column(Integer, ForeignKey('companies.id'), nullable=False, index=True)
     reference_date = Column(DateTime, nullable=False)
     name = Column(String(255), nullable=False)
-    document = Column(String(20)) # CPF
-    position = Column(String(100)) # Ex: "Conselho de Administração - Efetivos"
-    role = Column(String(100)) # Ex: "Conselheiro(a) de Administração"
+    document = Column(String(20))
+    position = Column(String(100))
+    role = Column(String(100))
     election_date = Column(DateTime)
     term_of_office = Column(String(50))
     professional_background = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
     company = relationship("Company", back_populates="administrators")
 
 class CompanyRiskFactor(Base):
-    """
-    Armazena os fatores de risco reportados pela empresa.
-    """
     __tablename__ = 'company_risk_factors'
     id = Column(Integer, primary_key=True)
     company_id = Column(Integer, ForeignKey('companies.id'), nullable=False, index=True)
     reference_date = Column(DateTime, nullable=False)
-    risk_type = Column(String(100)) # Ex: "De Mercado", "Operacionais"
+    risk_type = Column(String(100))
     risk_description = Column(Text)
     mitigation_measures = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
-
     company = relationship("Company", back_populates="risk_factors")
-
-# --- OUTROS MODELOS ---
-class Ticker(Base):
-    __tablename__ = 'tickers'
-    id = Column(Integer, primary_key=True)
-    symbol = Column(String(10), unique=True, nullable=False)
-    company_id = Column(Integer, ForeignKey('companies.id'))
-    created_at = Column(DateTime, default=datetime.utcnow)
