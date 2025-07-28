@@ -1,8 +1,8 @@
 # scripts/refactor_schema.py
 import os
 import sys
-from sqlalchemy import create_engine, inspect, text, BigInteger, Text, JSON, String, Integer
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, inspect, text, BigInteger, Text, JSON, String
+import logging
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from scraper.config import DATABASE_URL
@@ -34,7 +34,6 @@ def update_database_schema():
         logger.info("Nenhuma nova tabela precisa ser criada.")
 
     # 2. Alteração de Tipos de Coluna (Generalizado)
-    # CORREÇÃO: Usar instâncias dos tipos (ex: BigInteger()) em vez das classes
     tables_to_check = {
         'capital_structure': {
             'qty_ordinary_shares': BigInteger(),
@@ -42,7 +41,7 @@ def update_database_schema():
             'qty_total_shares': BigInteger(),
         },
         'company_administrators': {
-            'term_of_office': String(100) # String já é instanciado com o comprimento
+            'term_of_office': String(100)
         }
     }
 
@@ -58,7 +57,6 @@ def update_database_schema():
                     if col_name in db_columns:
                         db_type_instance = db_columns[col_name]
                         
-                        # Compara o tipo genérico e o comprimento para VARCHAR
                         is_different = not isinstance(db_type_instance, type(col_type_instance)) or \
                                        (isinstance(col_type_instance, String) and db_type_instance.length < col_type_instance.length)
 
