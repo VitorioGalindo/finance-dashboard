@@ -44,8 +44,7 @@ def inspect_company_data(cvm_code_to_inspect: str):
             return
 
         report = latest_annual_report[0]
-        print(f"
---- Inspecionando o relatório de {report.reference_date.strftime('%Y-%m-%d')} (Versão: {report.version}) ---")
+        print(f"--- Inspecionando o relatório de {report.reference_date.strftime('%Y-%m-%d')} (Versão: {report.version}) ---")
         financial_data = report.data
         
         if not financial_data:
@@ -60,14 +59,12 @@ def inspect_company_data(cvm_code_to_inspect: str):
         }
         
         for statement_name, accounts in key_accounts.items():
-            print(f"
-[ {statement_name} ]")
+            print(f"[ {statement_name} ]")
             for code, description in accounts.items():
                 value = financial_data.get(code)
                 print(f"  - {description} (Conta {code}): {f'{value:,.2f}' if value is not None else 'Não encontrado'}")
         
-        print("
---- INSPEÇÃO CONCLUÍDA ---")
+        print("--- INSPEÇÃO CONCLUÍDA ---")
 
 def inspect_dre_for_years(cvm_code_to_inspect: str, years: list[int]):
     """
@@ -112,8 +109,7 @@ def inspect_dre_for_years(cvm_code_to_inspect: str, years: list[int]):
         }
 
         for report in reports:
-            print(f"
---- DRE para o ano de {report.reference_date.year} (Dados Consolidados) ---")
+            print(f"--- DRE para o ano de {report.reference_date.year} (Dados Consolidados) ---")
             financial_data = report.data
             
             dre_account_codes = sorted([k for k in financial_data.keys() if k.startswith('3.')])
@@ -127,8 +123,7 @@ def inspect_dre_for_years(cvm_code_to_inspect: str, years: list[int]):
                 value = financial_data.get(code, 0)
                 print(f"  - {description:<55}: {value:,.2f}")
     
-    print("
---- TESTE CONCLUÍDO ---")
+    print("--- TESTE CONCLUÍDO ---")
 
 if __name__ == '__main__':
     if len(sys.argv) > 2 and sys.argv[1] == 'dre':
@@ -145,6 +140,5 @@ if __name__ == '__main__':
     else:
         print("Uso Padrão: python scripts/db_inspector.py <codigo_cvm>")
         print("Novo Teste DRE: python scripts/db_inspector.py dre <codigo_cvm> <ano1> <ano2> ...")
-        print("
-Executando inspeção padrão para PETR4 (9512)...")
+        print("Executando inspeção padrão para PETR4 (9512)...")
         inspect_company_data("9512")
