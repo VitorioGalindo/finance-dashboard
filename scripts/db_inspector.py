@@ -1,87 +1,124 @@
-# scripts/db_inspector.py (Versão Corrigida)
+# scripts/db_inspector.py
 import os
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, inspect, text
-import pandas as pd
 import sys
+import json
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
 
-def get_db_connection_string():
-    """Lê as credenciais do .env e cria uma string de conexão SQLAlchemy."""
-    load_dotenv()
-    user = os.getenv("DB_USER")
-    password = os.getenv("DB_PASSWORD")
-    host = os.getenv("DB_HOST")
-    dbname = os.getenv("DB_NAME", "postgres")
-    if not all([user, password, host, dbname]):
-        raise ValueError("Credenciais do banco (DB_USER, DB_PASSWORD, DB_HOST, DB_NAME) não encontradas.")
-    
-    return f"postgresql+psycopg2://{user}:{password}@{host}/{dbname}?sslmode=require"
+# Adiciona o diretório raiz ao path para importações corretas
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-def inspect_database():
-    """Conecta ao banco de dados e imprime sua estrutura detalhada."""
-    print("--- INICIANDO SCRIPT DE INSPEÇÃO DO BANCO DE DADOS (VERSÃO CORRIGIDA) ---")
+from scraper.config import DATABASE_URL
+from scraper.models import Company, FinancialStatement
+
+def inspect_company_data(cvm_code_to_inspect: str):
+    """
+    Conecta ao banco de dados e realiza uma inspeção profunda nos dados financeiros
+    de uma empresa específica para verificar a integridade dos dados.
+    """
+    print(f"--- INICIANDO INSPEÇÃO PARA A EMPRESA COM CÓDIGO CVM: {cvm_code_to_inspect} ---")
     
-    try:
-        engine = create_engine(get_db_connection_string())
-        inspector = inspect(engine)
+    engine = create_engine(DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+    
+    with Session() as session:
+        # 1. Buscar a empresa pelo código CVM
+        company = session.execute(
+            select(Company).where(Company.cvm_code == int(cvm_code_to_inspect))
+        ).scalar_one_or_none()
         
-        with engine.connect() as connection:
-            print(f"Dialeto do Banco: {connection.dialect.name}")
-            server_version = connection.execute(text("SELECT version();")).scalar()
-            print(f"Versão do Servidor: {server_version}")
+        if not company:
+            print(f"❌ ERRO: Empresa com código CVM '{cvm_code_to_inspect}' não encontrada na tabela 'companies'.")
+            return
+            
+        print(f"✅ Empresa encontrada: {company.company_name} (ID: {company.id})")
+        
+        # 2. Buscar o último relatório anual (DFP) disponível para essa empresa
+        latest_annual_report = session.execute(
+            select(FinancialStatement)
+            .where(FinancialStatement.company_id == company.id)
+            .where(FinancialStatement.report_type == 'DFP')
+            .order_by(FinancialStatement.reference_date.desc())
+        ).first()
+        
+        if not latest_annual_report:
+            print(f"❌ AVISO: Nenhum relatório anual (DFP) encontrado para {company.company_name}.")
+            return
 
-        schemas = inspector.get_schema_names()
-        print(f"Esquemas encontrados: {schemas}")
+        # latest_annual_report é uma tupla (Row), o objeto está no primeiro elemento
+        report = latest_annual_report[0]
+        
+        print(f"
+--- Inspecionando o relatório de {report.reference_date.strftime('%Y-%m-%d')} (Versão: {report.version}) ---")
 
-        for schema in schemas:
-            if schema.startswith('pg_') or schema == 'information_schema':
-                continue
+        # 3. Carregar o campo 'data' que contém todos os dados financeiros
+        financial_data = report.data
+        
+        if not financial_data:
+            print("❌ ERRO: O campo 'data' do relatório está vazio!")
+            return
+            
+        print(f"O relatório contém {len(financial_data)} contas (linhas) diferentes.")
 
-            print(f"{'='*30} ESQUEMA: {schema.upper()} {'='*30}")
-            tables = sorted(inspector.get_table_names(schema=schema))
-            print(f"Tabelas encontradas: {tables}")
+        # 4. Exibir exemplos de contas-chave de cada demonstrativo
+        print("
+--- AMOSTRA DE DADOS ---")
+        
+        # Mapeamento de algumas contas importantes para verificação
+        key_accounts = {
+            "Balanço Patrimonial Ativo (BPA)": {
+                "1": "Ativo Total",
+                "1.01": "Ativo Circulante",
+                "1.02": "Ativo Não Circulante"
+            },
+            "Balanço Patrimonial Passivo (BPP)": {
+                "2": "Passivo Total",
+                "2.01": "Passivo Circulante",
+                "2.02": "Passivo Não Circulante",
+                "2.03": "Patrimônio Líquido Consolidado"
+            },
+            "Demonstração do Resultado (DRE)": {
+                "3.01": "Receita de Venda de Bens e/ou Serviços",
+                "3.03": "Resultado Bruto",
+                "3.05": "Resultado Antes do Resultado Financeiro e dos Tributos",
+                "3.11": "Lucro ou Prejuízo Consolidado do Período"
+            },
+            "Demonstração do Fluxo de Caixa (DFC)": {
+                "6.01": "Atividades Operacionais",
+                "6.02": "Atividades de Investimento",
+                "6.03": "Atividades de Financiamento"
+            }
+        }
+        
+        found_any_key = False
+        for statement_name, accounts in key_accounts.items():
+            print(f"
+[ {statement_name} ]")
+            for code, description in accounts.items():
+                value = financial_data.get(code)
+                if value is not None:
+                    print(f"  - {description} (Conta {code}): {value:,.2f}")
+                    found_any_key = True
+                else:
+                    print(f"  - {description} (Conta {code}): Não encontrado")
 
-            for table_name in tables:
-                print(f"--- Tabela: {schema}.{table_name} ---")
-                
-                try:
-                    pk_constraint = inspector.get_pk_constraint(table_name, schema=schema)
-                    pk_columns = pk_constraint.get('constrained_columns', [])
-                    print(f"  Chave Primária: {pk_columns if pk_columns else 'N/A'}")
+        if not found_any_key:
+            print("
+AVISO: Nenhuma das contas-chave de exemplo foi encontrada. O plano de contas pode ser diferente.")
+            print("Abaixo, uma amostra bruta do JSON para análise:")
+            print(json.dumps({k: v for i, (k, v) in enumerate(financial_data.items()) if i < 10}, indent=2))
+            
+        print("
+--- INSPEÇÃO CONCLUÍDA ---")
 
-                    print("  Estrutura das Colunas:")
-                    columns = inspector.get_columns(table_name, schema=schema)
-                    for column in columns:
-                        # CORREÇÃO: Converte o tipo da coluna para string antes de formatar
-                        column_type_str = str(column['type'])
-                        col_info = (
-                            f"    - Nome: {column['name']:<25} | "
-                            f"Tipo: {column_type_str:<20} | "
-                            f"Nulável: {column['nullable']:<5} | "
-                            f"Default: {column['default']}"
-                        )
-                        print(col_info)
-                    
-                    foreign_keys = inspector.get_foreign_keys(table_name, schema=schema)
-                    if foreign_keys:
-                        print("  Chaves Estrangeiras:")
-                        for fk in foreign_keys:
-                            fk_info = (
-                                f"    - Coluna(s) local: {fk['constrained_columns']} "
-                                f"-> Refere-se a: {fk['referred_table']}.{fk['referred_columns'][0]}"
-                            )
-                            print(fk_info)
-                    else:
-                        print("  Chaves Estrangeiras: Nenhuma")
 
-                except Exception as table_e:
-                    print(f"  ERRO ao inspecionar a estrutura da tabela {table_name}: {table_e}")
-
-    except Exception as e:
-        print(f"Ocorreu um erro fatal durante a inspeção: {e}", file=sys.stderr)
-        sys.exit(1)
-    finally:
-        print(f"{'='*70}--- SCRIPT DE INSPEÇÃO CONCLUÍDO ---{'='*70}")
-
-if __name__ == "__main__":
-    inspect_database()
+if __name__ == '__main__':
+    # Pega o código CVM da linha de comando, ou usa um padrão (ex: Petrobras)
+    if len(sys.argv) > 1:
+        cvm_code = sys.argv[1]
+    else:
+        print("Nenhum código CVM fornecido. Usando '9512' (Petrobras) como padrão.")
+        print("Uso: python scripts/db_inspector.py <codigo_cvm>")
+        cvm_code = "9512" 
+        
+    inspect_company_data(cvm_code)
