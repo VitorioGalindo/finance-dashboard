@@ -2,6 +2,7 @@
 import os
 import sys
 import pandas as pd
+import io # <-- ADICIONADO AQUI
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -10,9 +11,9 @@ from sqlalchemy.orm import sessionmaker
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scraper')))
 
-# --- IMPORTAÇÕES CORRIGIDAS ---
+# --- IMPORTAÇÕES ---
 from models import Base, Company
-from services.scraper_cvm_advanced import CVMAdvancedScraper # NOME CORRIGIDO AQUI
+from services.scraper_cvm_advanced import CVMAdvancedScraper
 
 def get_db_connection_string():
     """Lê as credenciais do .env na raiz do projeto."""
