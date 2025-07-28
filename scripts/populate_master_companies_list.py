@@ -72,8 +72,7 @@ def get_cvm_master_data():
 
 def run_etl():
     """Orquestra o processo de ETL para criar a lista mestra de empresas."""
-    print("
---- INICIANDO ETL DA LISTA MESTRA DE EMPRESAS ---")
+    print("--- INICIANDO ETL DA LISTA MESTRA DE EMPRESAS ---")
     
     engine = create_engine(get_db_connection_string())
     Session = sessionmaker(bind=engine)
