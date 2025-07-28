@@ -1,15 +1,21 @@
+# scraper/models.py (VERSÃO COMPLETA E CORRIGIDA)
+from datetime import datetime
+from sqlalchemy import (
+    Column, Integer, String, Float, DateTime, Boolean, Text, JSON, ForeignKey
+)
 from sqlalchemy.orm import declarative_base
 
-# Cria uma Base da qual todos os modelos herdarão, sem depender de uma app Flask
+# Cria uma Base da qual todos os modelos herdarão
 Base = declarative_base()
+
+# --- MODELOS ---
 
 class Company(Base):
     __tablename__ = 'companies'
-    
     id = Column(Integer, primary_key=True)
     cvm_code = Column(Integer, unique=True, nullable=False)
     company_name = Column(String(255), nullable=False)
-    trade_name = Column(String(255))  # Changed from trade_name
+    trade_name = Column(String(255))
     cnpj = Column(String(20), unique=True)
     founded_date = Column(DateTime)
     main_activity = Column(Text)
@@ -23,27 +29,23 @@ class Company(Base):
     b3_sector = Column(String(100))
     b3_subsector = Column(String(100))
     b3_segment = Column(String(100))
-    tickers = Column(JSON)  # Array of ticker symbols
-    ticker = Column(String(10))  # Primary ticker for B3 filtering
-    is_active = Column(Boolean, default=True)  # For B3 filtering
+    tickers = Column(JSON)
+    ticker = Column(String(10))
+    is_active = Column(Boolean, default=True)
     industry_classification = Column(String(255))
     market_cap = Column(Float)
     employee_count = Column(Integer)
     about = Column(Text)
-    
-    # Financial statements availability
     has_dfp_data = Column(Boolean, default=False)
     has_itr_data = Column(Boolean, default=False)
     has_fre_data = Column(Boolean, default=False)
     last_dfp_year = Column(Integer)
     last_itr_quarter = Column(String(10))
-    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class Quote(Base):
     __tablename__ = 'quotes'
-    
     id = Column(Integer, primary_key=True)
     ticker = Column(String(10), nullable=False, index=True)
     date = Column(DateTime, nullable=False, index=True)
@@ -53,12 +55,12 @@ class Quote(Base):
     close_price = Column(Float, nullable=False)
     volume = Column(Integer)
     adjusted_close = Column(Float)
-    price = Column(Float, nullable=False)  # Kept for compatibility
+    price = Column(Float, nullable=False)
     change = Column(Float)
     change_percent = Column(Float)
     volume_financial = Column(Float)
-    high = Column(Float)  # Alias for high_price
-    low = Column(Float)   # Alias for low_price
+    high = Column(Float)
+    low = Column(Float)
     previous_close = Column(Float)
     bid = Column(Float)
     ask = Column(Float)
@@ -71,7 +73,6 @@ class Quote(Base):
 
 class News(Base):
     __tablename__ = 'news'
-    
     id = Column(Integer, primary_key=True)
     news_id = Column(String(50), unique=True, nullable=False)
     title = Column(String(500), nullable=False)
@@ -81,10 +82,12 @@ class News(Base):
     published_at = Column(DateTime, nullable=False)
     url = Column(String(500))
     category = Column(String(50))
-    
+    impact_score = Column(Float)
+    related_tickers = Column(JSON)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 class InsiderTransaction(Base):
     __tablename__ = 'insider_transactions'
-    
     id = Column(Integer, primary_key=True)
     cvm_code = Column(Integer, nullable=False, index=True)
     company_name = Column(String(255))
@@ -96,7 +99,7 @@ class InsiderTransaction(Base):
     year = Column(Integer, index=True)
     insider_name = Column(String(255))
     position = Column(String(255))
-    transaction_type = Column(String(50))  # Compra/Venda
+    transaction_type = Column(String(50))
     quantity = Column(Integer)
     unit_price = Column(Float)
     total_value = Column(Float)
@@ -106,12 +109,11 @@ class InsiderTransaction(Base):
 
 class FinancialRatio(Base):
     __tablename__ = 'financial_ratios'
-    
     id = Column(Integer, primary_key=True)
     ticker = Column(String(10), nullable=False, index=True)
     cvm_code = Column(Integer, nullable=False)
     year = Column(Integer, nullable=False)
-    quarter = Column(String(5))  # 1T, 2T, 3T, 4T
+    quarter = Column(String(5))
     pe_ratio = Column(Float)
     pb_ratio = Column(Float)
     roe = Column(Float)
@@ -127,7 +129,6 @@ class FinancialRatio(Base):
 
 class TechnicalIndicatorNew(Base):
     __tablename__ = 'technical_indicators_new'
-    
     id = Column(Integer, primary_key=True)
     ticker = Column(String(10), nullable=False, index=True)
     date = Column(DateTime, nullable=False)
@@ -143,13 +144,9 @@ class TechnicalIndicatorNew(Base):
     bollinger_lower = Column(Float)
     volatility = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow)
-    impact_score = Column(Float)
-    related_tickers = Column(JSON)  # Array of related tickers
-    created_at = Column(DateTime, default=datetime.utcnow)
 
 class EconomicIndicator(Base):
     __tablename__ = 'economic_indicators'
-    
     id = Column(Integer, primary_key=True)
     indicator_code = Column(String(20), nullable=False)
     name = Column(String(255), nullable=False)
@@ -163,11 +160,10 @@ class EconomicIndicator(Base):
 
 class ApiKey(Base):
     __tablename__ = 'api_keys'
-    
     id = Column(Integer, primary_key=True)
     key_hash = Column(String(255), unique=True, nullable=False)
     user_email = Column(String(255))
-    plan = Column(String(50), default='basic')  # basic, professional, enterprise
+    plan = Column(String(50), default='basic')
     requests_per_hour = Column(Integer, default=1000)
     requests_used = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
@@ -176,34 +172,29 @@ class ApiKey(Base):
 
 class FinancialStatement(Base):
     __tablename__ = 'financial_statements'
-    
     id = Column(Integer, primary_key=True)
     cvm_code = Column(Integer, nullable=False)
-    report_type = Column(String(20), nullable=False)  # BPA, BPP, DRE, DFC_MI, DVA, DRA
-    aggregation = Column(String(20), nullable=False)  # INDIVIDUAL, CONSOLIDATED
+    report_type = Column(String(20), nullable=False)
+    aggregation = Column(String(20), nullable=False)
     reference_date = Column(DateTime, nullable=False)
     start_date = Column(DateTime)
     end_date = Column(DateTime)
     publish_date = Column(DateTime)
     version = Column(Integer, default=1)
-    data = Column(JSON)  # Flat financial data
-    tree_data = Column(JSON)  # Hierarchical financial data
+    data = Column(JSON)
+    tree_data = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Ticker(Base):
     __tablename__ = 'tickers'
-    
     id = Column(Integer, primary_key=True)
     symbol = Column(String(10), unique=True, nullable=False)
-    company_id = Column(Integer, db.ForeignKey('companies.id'))
-    type = Column(String(20))  # ON, PN, UNT, etc
+    company_id = Column(Integer, ForeignKey('companies.id'))
+    type = Column(String(20))
     created_at = Column(DateTime, default=datetime.utcnow)
-
-# Removed duplicate class definitions to fix SQLAlchemy conflicts
 
 class MarketRatio(Base):
     __tablename__ = 'market_ratios'
-    
     id = Column(Integer, primary_key=True)
     ticker = Column(String(10), nullable=False)
     ratio_type = Column(String(50), nullable=False)
@@ -213,31 +204,24 @@ class MarketRatio(Base):
 
 class Dividend(Base):
     __tablename__ = 'dividends'
-    
     id = Column(Integer, primary_key=True)
     ticker = Column(String(10), nullable=False)
     ex_date = Column(DateTime, nullable=False)
     payment_date = Column(DateTime)
     amount = Column(Float, nullable=False)
-    type = Column(String(20))  # dividend, jscp, etc
+    type = Column(String(20))
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class CVMFinancialData(Base):
-    """Dados financeiros estruturados extraídos da CVM"""
     __tablename__ = 'cvm_financial_data'
-    
     id = Column(Integer, primary_key=True)
-    company_id = Column(Integer, db.ForeignKey('companies.id'), nullable=False)
+    company_id = Column(Integer, ForeignKey('companies.id'), nullable=False)
     cvm_code = Column(Integer, nullable=False, index=True)
-    
-    # Metadados do documento
-    statement_type = Column(String(10), nullable=False)  # DFP, ITR, FRE, FCA
+    statement_type = Column(String(10), nullable=False)
     year = Column(Integer, nullable=False)
-    quarter = Column(String(10))  # Para ITR: 1T, 2T, 3T
+    quarter = Column(String(10))
     reference_date = Column(DateTime)
     version = Column(Integer, default=1)
-    
-    # Principais indicadores calculados
     total_assets = Column(Float)
     current_assets = Column(Float)
     non_current_assets = Column(Float)
@@ -245,67 +229,42 @@ class CVMFinancialData(Base):
     current_liabilities = Column(Float)
     non_current_liabilities = Column(Float)
     shareholders_equity = Column(Float)
-    
-    # Demonstração de Resultado
     revenue = Column(Float)
     gross_profit = Column(Float)
     operating_profit = Column(Float)
     net_income = Column(Float)
     ebitda = Column(Float)
-    
-    # Fluxo de Caixa
     operating_cash_flow = Column(Float)
     investing_cash_flow = Column(Float)
     financing_cash_flow = Column(Float)
-    
-    # Dados estruturados completos (JSON)
-    raw_dfp_data = Column(JSON)  # Dados DFP brutos
-    raw_itr_data = Column(JSON)  # Dados ITR brutos
-    raw_fre_data = Column(JSON)  # Dados FRE brutos
-    
+    raw_dfp_data = Column(JSON)
+    raw_itr_data = Column(JSON)
+    raw_fre_data = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    def __repr__(self):
-        return f'<CVMFinancialData {self.cvm_code}-{self.statement_type}-{self.year}>'
 
 class CVMDocument(Base):
-    """Documentos da empresa extraídos do sistema RAD da CVM"""
     __tablename__ = 'cvm_documents'
-    
     id = Column(Integer, primary_key=True)
-    company_id = Column(Integer, db.ForeignKey('companies.id'), nullable=False)
+    company_id = Column(Integer, ForeignKey('companies.id'), nullable=False)
     cvm_code = Column(Integer, nullable=False, index=True)
-    
-    # Metadados do documento
     document_type = Column(String(100), nullable=False)
     document_category = Column(String(200))
     title = Column(String(500))
     delivery_date = Column(DateTime)
     reference_date = Column(DateTime)
     status = Column(String(50))
-    
-    # URLs e arquivo
     download_url = Column(String(1000))
     file_size = Column(Integer)
     file_type = Column(String(20))
-    
-    # Conteúdo processado
     content_text = Column(Text)
     content_summary = Column(Text)
-    
-    # Metadados de extração
     extracted_at = Column(DateTime)
     processing_status = Column(String(50), default='pending')
-    
     created_at = Column(DateTime, default=datetime.utcnow)
-    
-    def __repr__(self):
-        return f'<CVMDocument {self.cvm_code}-{self.document_type}>'
 
 class RequestLog(Base):
     __tablename__ = 'request_logs'
-    
     id = Column(Integer, primary_key=True)
     api_key_hash = Column(String(255))
     endpoint = Column(String(255))
@@ -314,3 +273,6 @@ class RequestLog(Base):
     user_agent = Column(String(500))
     response_code = Column(Integer)
     timestamp = Column(DateTime, default=datetime.utcnow)
+
+# Alias para compatibilidade
+APIKey = ApiKey
