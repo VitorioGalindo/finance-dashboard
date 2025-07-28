@@ -94,7 +94,7 @@ class InsiderTransaction(Base):
     id = Column(Integer, primary_key=True)
     cvm_code = Column(Integer, nullable=False, index=True)
     company_name = Column(String(255))
-    document_.type = Column(String(50))
+    document_type = Column(String(50))
     delivery_date = Column(DateTime)
     reference_date = Column(DateTime)
     status = Column(String(50))
