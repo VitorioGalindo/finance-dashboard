@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Dados Financeiros PRIO S.A.</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .financial-table {
+            font-size: 0.9rem;
+        }
+        .financial-value {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+        }
+        .year-header {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .negative {
+            color: #dc3545;
+        }
+        .positive {
+            color: #198754;
+        }
+        .section-header {
+            background-color: #e9ecef;
+            font-weight: bold;
+            border-top: 2px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="text-center mb-4">📊 Demonstrações Financeiras - {{ company.company_name }}</h1>
+                <div class="text-center mb-3">
+                    <span class="badge bg-primary">CVM: {{ company.cvm_code }}</span>
+                    <span class="badge bg-info">CNPJ: {{ company.cnpj or 'N/A' }}</span>
+                    <span class="badge bg-success">Setor: {{ company.b3_sector or 'N/A' }}</span>
+                </div>
+            </div>
+        </div>
+
+        {% if financial_data %}
+        <!-- Resumo Executivo -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📈 Resumo Executivo (Últimos 4 Anos)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped financial-table">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Indicador</th>
+                                        {% for year in years %}
+                                        <th class="text-center">{{ year }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>Receita Líquida (R$ mil)</strong></td>
+                                        {% for year in years %}
+                                        <td class="financial-value">
+                                            {% set data = financial_data.get(year, {}) %}
+                                            {% if data.revenue %}
+                                                {{ "{:,.0f}".format(data.revenue/1000) }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        {% endfor %}
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Lucro Líquido (R$ mil)</strong></td>
+                                        {% for year in years %}
+                                        <td class="financial-value">
+                                            {% set data = financial_data.get(year, {}) %}
+                                            {% if data.net_income %}
+                                                <span class="{% if data.net_income > 0 %}positive{% else %}negative{% endif %}">
+                                                    {{ "{:,.0f}".format(data.net_income/1000) }}
+                                                </span>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        {% endfor %}
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Ativo Total (R$ mil)</strong></td>
+                                        {% for year in years %}
+                                        <td class="financial-value">
+                                            {% set data = financial_data.get(year, {}) %}
+                                            {% if data.total_assets %}
+                                                {{ "{:,.0f}".format(data.total_assets/1000) }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        {% endfor %}
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Patrimônio Líquido (R$ mil)</strong></td>
+                                        {% for year in years %}
+                                        <td class="financial-value">
+                                            {% set data = financial_data.get(year, {}) %}
+                                            {% if data.shareholders_equity %}
+                                                {{ "{:,.0f}".format(data.shareholders_equity/1000) }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        {% endfor %}
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detalhamento por Ano -->
+        {% for year in years %}
+        {% set data = financial_data.get(year, {}) %}
+        {% if data %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header year-header">
+                        <h5>📋 Demonstrações Financeiras - {{ year }}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Balanço Patrimonial -->
+                            <div class="col-md-4">
+                                <h6 class="text-primary">🏛️ Balanço Patrimonial</h6>
+                                <table class="table table-sm">
+                                    <tbody>
+                                        <tr class="section-header">
+                                            <td colspan="2">ATIVO</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Ativo Circulante</td>
+                                            <td class="financial-value">
+                                                {% if data.current_assets %}
+                                                    {{ "{:,.0f}".format(data.current_assets/1000) }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Ativo Não Circulante</td>
+                                            <td class="financial-value">
+                                                {% if data.non_current_assets %}
+                                                    {{ "{:,.0f}".format(data.non_current_assets/1000) }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr style="border-top: 2px solid #000;">
+                                            <td><strong>ATIVO TOTAL</strong></td>
+                                            <td class="financial-value">
+                                                <strong>
+                                                    {% if data.total_assets %}
+                                                        {{ "{:,.0f}".format(data.total_assets/1000) }}
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </strong>
+                                            </td>
+                                        </tr>
+                                        <tr class="section-header">
+                                            <td colspan="2">PASSIVO E PATRIMÔNIO</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Passivo Circulante</td>
+                                            <td class="financial-value">
+                                                {% if data.current_liabilities %}
+                                                    {{ "{:,.0f}".format(data.current_liabilities/1000) }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Passivo Não Circulante</td>
+                                            <td class="financial-value">
+                                                {% if data.non_current_liabilities %}
+                                                    {{ "{:,.0f}".format(data.non_current_liabilities/1000) }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Patrimônio Líquido</td>
+                                            <td class="financial-value">
+                                                {% if data.shareholders_equity %}
+                                                    {{ "{:,.0f}".format(data.shareholders_equity/1000) }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Demonstração de Resultado -->
+                            <div class="col-md-4">
+                                <h6 class="text-success">💰 Demonstração de Resultado</h6>
+                                <table class="table table-sm">
+                                    <tbody>
+                                        <tr>
+                                            <td>Receita Líquida</td>
+                                            <td class="financial-value">
+                                                {% if data.revenue %}
+                                                    {{ "{:,.0f}".format(data.revenue/1000) }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Lucro Bruto</td>
+                                            <td class="financial-value">
+                                                {% if data.gross_profit %}
+                                                    {{ "{:,.0f}".format(data.gross_profit/1000) }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Lucro Operacional</td>
+                                            <td class="financial-value">
+                                                {% if data.operating_profit %}
+                                                    {{ "{:,.0f}".format(data.operating_profit/1000) }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>EBITDA</td>
+                                            <td class="financial-value">
+                                                {% if data.ebitda %}
+                                                    {{ "{:,.0f}".format(data.ebitda/1000) }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr style="border-top: 2px solid #000;">
+                                            <td><strong>Lucro Líquido</strong></td>
+                                            <td class="financial-value">
+                                                <strong>
+                                                    {% if data.net_income %}
+                                                        <span class="{% if data.net_income > 0 %}positive{% else %}negative{% endif %}">
+                                                            {{ "{:,.0f}".format(data.net_income/1000) }}
+                                                        </span>
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </strong>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Fluxo de Caixa -->
+                            <div class="col-md-4">
+                                <h6 class="text-info">💸 Fluxo de Caixa</h6>
+                                <table class="table table-sm">
+                                    <tbody>
+                                        <tr>
+                                            <td>Fluxo Operacional</td>
+                                            <td class="financial-value">
+                                                {% if data.operating_cash_flow %}
+                                                    <span class="{% if data.operating_cash_flow > 0 %}positive{% else %}negative{% endif %}">
+                                                        {{ "{:,.0f}".format(data.operating_cash_flow/1000) }}
+                                                    </span>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Fluxo de Investimento</td>
+                                            <td class="financial-value">
+                                                {% if data.investing_cash_flow %}
+                                                    <span class="{% if data.investing_cash_flow > 0 %}positive{% else %}negative{% endif %}">
+                                                        {{ "{:,.0f}".format(data.investing_cash_flow/1000) }}
+                                                    </span>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Fluxo de Financiamento</td>
+                                            <td class="financial-value">
+                                                {% if data.financing_cash_flow %}
+                                                    <span class="{% if data.financing_cash_flow > 0 %}positive{% else %}negative{% endif %}">
+                                                        {{ "{:,.0f}".format(data.financing_cash_flow/1000) }}
+                                                    </span>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+
+        {% else %}
+        <!-- Caso não tenha dados -->
+        <div class="row">
+            <div class="col-12">
+                <div class="alert alert-warning text-center">
+                    <h4>⚠️ Dados Financeiros não Disponíveis</h4>
+                    <p>Os dados financeiros para {{ company.company_name }} ainda não foram processados ou não estão disponíveis no período solicitado (2020-2023).</p>
+                    <p>Status da empresa:</p>
+                    <ul class="list-unstyled">
+                        <li>✅ Dados DFP: {{ 'Sim' if company.has_dfp_data else 'Não' }}</li>
+                        <li>✅ Dados ITR: {{ 'Sim' if company.has_itr_data else 'Não' }}</li>
+                        <li>✅ Dados FRE: {{ 'Sim' if company.has_fre_data else 'Não' }}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Debug Info -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-secondary">
+                    <div class="card-header bg-light">
+                        <h6>🔧 Informações de Debug</h6>
+                    </div>
+                    <div class="card-body">
+                        <small class="text-muted">
+                            <strong>Empresa:</strong> {{ company.company_name }} (CVM: {{ company.cvm_code }})<br>
+                            <strong>Total de registros financeiros:</strong> {{ total_records }}<br>
+                            <strong>Períodos disponíveis:</strong> {{ available_years | join(', ') if available_years else 'Nenhum' }}<br>
+                            <strong>Tipos de demonstrações:</strong> {{ statement_types | join(', ') if statement_types else 'Nenhum' }}<br>
+                            <strong>Última atualização:</strong> {{ company.updated_at.strftime('%d/%m/%Y %H:%M') if company.updated_at else 'N/A' }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

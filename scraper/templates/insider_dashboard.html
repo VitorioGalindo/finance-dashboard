@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radar de Insiders (CVM 44) - PRIO S.A.</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .dashboard-container {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .card-custom {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header-card {
+            background: rgba(26, 35, 126, 0.9);
+            color: white;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stats-card {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .stats-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #1a237e;
+        }
+        
+        .stats-label {
+            color: #666;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .transaction-table {
+            font-size: 0.9rem;
+        }
+        
+        .transaction-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            border: none;
+            padding: 15px 10px;
+        }
+        
+        .transaction-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
+        }
+        
+        .badge-buy {
+            background: #4caf50;
+            color: white;
+        }
+        
+        .badge-sell {
+            background: #f44336;
+            color: white;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+        
+        .period-selector {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .btn-period {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            margin: 0 5px;
+            border-radius: 8px;
+        }
+        
+        .btn-period.active {
+            background: #fff;
+            color: #1a237e;
+        }
+        
+        .insider-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .position-badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="container-fluid">
+            <!-- Header -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card-custom header-card">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <h2 class="mb-1">🎯 Radar de Insiders (CVM 44)</h2>
+                                    <h4 class="mb-0">{{ company_name }} - {{ year }}</h4>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <div class="period-selector">
+                                        <button class="btn btn-period active">2024</button>
+                                        <button class="btn btn-period">2023</button>
+                                        <button class="btn btn-period">2022</button>
+                                        <button class="btn btn-period">Analisar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card-custom stats-card">
+                        <div class="stats-number">{{ total_transactions }}</div>
+                        <div class="stats-label">Total de Transações</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card-custom stats-card">
+                        <div class="stats-number text-success">{{ buy_transactions }}</div>
+                        <div class="stats-label">Compras</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card-custom stats-card">
+                        <div class="stats-number text-danger">{{ sell_transactions }}</div>
+                        <div class="stats-label">Vendas</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card-custom stats-card">
+                        <div class="stats-number">R$ {{ "%.1f"|format(total_volume/1000000) }}M</div>
+                        <div class="stats-label">Volume Total</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart and Price -->
+            <div class="row mb-4">
+                <div class="col-md-8">
+                    <div class="card-custom">
+                        <div class="card-header">
+                            <h5>📈 Movimentações x Preço da Ação</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="priceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card-custom">
+                        <div class="card-header">
+                            <h5>📊 Estatísticas</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <div class="mb-3">
+                                        <div class="h4 text-primary">{{ unique_insiders }}</div>
+                                        <div class="small text-muted">Insiders Ativos</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="mb-3">
+                                        <div class="h4 text-info">R$ {{ "%.2f"|format(avg_price) }}</div>
+                                        <div class="small text-muted">Preço Médio</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="mb-3">
+                                        <div class="h4 text-success">{{ "%.1f"|format(buy_percentage) }}%</div>
+                                        <div class="small text-muted">% Compras</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="mb-3">
+                                        <div class="h4 text-warning">{{ max_quantity|round|int }}</div>
+                                        <div class="small text-muted">Maior Transação</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transactions Table -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card-custom">
+                        <div class="card-header">
+                            <h5>📋 Movimentações</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table transaction-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Data da Transação</th>
+                                            <th>Insider</th>
+                                            <th>Cargo</th>
+                                            <th>Operação</th>
+                                            <th>Quantidade</th>
+                                            <th>Preço Unitário</th>
+                                            <th>Valor Total</th>
+                                            <th>Posição Final</th>
+                                            <th>% da Posição</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for transaction in transactions %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ transaction.transaction_date }}</strong><br>
+                                                <small class="text-muted">Entrega: {{ transaction.delivery_date }}</small>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="insider-avatar">
+                                                        {{ transaction.insider_name.split()[0][0] }}{{ transaction.insider_name.split()[1][0] if transaction.insider_name.split()|length > 1 else '' }}
+                                                    </div>
+                                                    <div>
+                                                        <strong>{{ transaction.insider_name }}</strong>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="position-badge">{{ transaction.position }}</span>
+                                            </td>
+                                            <td>
+                                                {% if transaction.transaction_type == 'Compra' %}
+                                                    <span class="badge badge-buy">📈 COMPRA</span>
+                                                {% else %}
+                                                    <span class="badge badge-sell">📉 VENDA</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-end">
+                                                <strong>{{ "{:,}".format(transaction.quantity) }}</strong>
+                                            </td>
+                                            <td class="text-end">
+                                                <strong>R$ {{ "%.2f"|format(transaction.unit_price) }}</strong>
+                                            </td>
+                                            <td class="text-end">
+                                                <strong>R$ {{ "{:,.2f}".format(transaction.total_value) }}</strong>
+                                            </td>
+                                            <td class="text-end">
+                                                {{ "{:,}".format(transaction.remaining_position) }}
+                                            </td>
+                                            <td class="text-end">
+                                                <span class="badge bg-light text-dark">
+                                                    {{ "%.1f"|format((transaction.quantity / transaction.remaining_position) * 100) }}%
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração do gráfico de preços
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        
+        // Dados simulados de preço da PRIO ao longo de 2024
+        const priceData = {
+            labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+            datasets: [{
+                label: 'Preço PRIO3',
+                data: [43.20, 41.80, 39.50, 44.75, 38.90, 42.15, 40.30, 45.60, 41.25, 43.80, 39.95, 44.20],
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+            }]
+        };
+
+        // Dados de transações para plotar no gráfico
+        const transactionData = [
+            {x: 'Jan', y: 43.20, type: 'buy', size: 8},
+            {x: 'Fev', y: 41.80, type: 'sell', size: 6},
+            {x: 'Mar', y: 39.50, type: 'buy', size: 10},
+            {x: 'Abr', y: 44.75, type: 'sell', size: 7},
+            {x: 'Mai', y: 38.90, type: 'buy', size: 9}
+        ];
+
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: priceData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Período'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Preço (R$)'
+                        },
+                        beginAtZero: false
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                }
+            }
+        });
+
+        // Adicionar pontos de transações
+        setTimeout(() => {
+            transactionData.forEach(transaction => {
+                const point = {
+                    type: 'scatter',
+                    data: [{
+                        x: transaction.x,
+                        y: transaction.y
+                    }],
+                    backgroundColor: transaction.type === 'buy' ? '#4caf50' : '#f44336',
+                    borderColor: transaction.type === 'buy' ? '#2e7d32' : '#c62828',
+                    pointRadius: transaction.size,
+                    pointHoverRadius: transaction.size + 2,
+                    showLine: false
+                };
+                
+                chart.data.datasets.push(point);
+            });
+            chart.update();
+        }, 1000);
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

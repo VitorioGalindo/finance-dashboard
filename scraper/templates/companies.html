@@ -1,0 +1,729 @@
+{% extends "base.html" %}
+
+{% block title %}Empresas - API Mercado Brasil{% endblock %}
+
+{% block content %}
+<!-- Header Section -->
+<section class="py-4 bg-light">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="h3 mb-2">
+                    <i class="fas fa-building me-2 text-primary"></i>
+                    Análise de Empresas
+                </h1>
+                <p class="text-muted mb-0">
+                    Dados fundamentalistas, demonstrações financeiras e indicadores de empresas listadas na B3
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="fas fa-filter me-1"></i>Filtros
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" data-filter="sector">Por Setor</a></li>
+                        <li><a class="dropdown-item" href="#" data-filter="segment">Por Segmento</a></li>
+                        <li><a class="dropdown-item" href="#" data-filter="marketcap">Por Valor de Mercado</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" onclick="clearFilters()">Limpar Filtros</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Search and Filters -->
+<section class="py-3 border-bottom">
+    <div class="container">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" class="form-control" id="company-search" 
+                           placeholder="Buscar empresa ou ticker..." />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="sector-filter">
+                    <option value="">Todos os Setores</option>
+                    <option value="Petróleo, Gás e Biocombustíveis">Petróleo & Gás</option>
+                    <option value="Materiais Básicos">Materiais Básicos</option>
+                    <option value="Financeiro">Financeiro</option>
+                    <option value="Utilidade Pública">Utilidade Pública</option>
+                    <option value="Consumo Cíclico">Consumo Cíclico</option>
+                    <option value="Consumo não Cíclico">Consumo não Cíclico</option>
+                    <option value="Tecnologia da Informação">Tecnologia</option>
+                    <option value="Comunicações">Comunicações</option>
+                    <option value="Bens Industriais">Bens Industriais</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="segment-filter">
+                    <option value="">Todos os Segmentos</option>
+                    <option value="Novo Mercado">Novo Mercado</option>
+                    <option value="Nível 2">Nível 2</option>
+                    <option value="Nível 1">Nível 1</option>
+                    <option value="Tradicional">Tradicional</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" onclick="searchCompanies()">
+                    <i class="fas fa-search me-1"></i>Buscar
+                </button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Companies List -->
+<section class="py-4">
+    <div class="container">
+        <div class="row">
+            <!-- Companies Table -->
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>
+                            Empresas Listadas
+                        </h5>
+                        <div class="d-flex align-items-center">
+                            <span class="text-muted me-3" id="results-count">Carregando...</span>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary active" data-view="table">
+                                    <i class="fas fa-table"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" data-view="cards">
+                                    <i class="fas fa-th-large"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <!-- Loading State -->
+                        <div id="loading-state" class="text-center py-5">
+                            <div class="spinner-border text-primary mb-3"></div>
+                            <p class="text-muted">Carregando empresas...</p>
+                        </div>
+
+                        <!-- Companies Table -->
+                        <div id="companies-table" class="table-responsive" style="display: none;">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Empresa</th>
+                                        <th>Setor</th>
+                                        <th>Valor de Mercado</th>
+                                        <th>Tickers</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="companies-tbody">
+                                    <!-- Companies will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Companies Cards -->
+                        <div id="companies-cards" class="row g-3 p-3" style="display: none;">
+                            <!-- Company cards will be populated here -->
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white border-0">
+                        <nav>
+                            <ul class="pagination justify-content-center mb-0" id="pagination">
+                                <!-- Pagination will be populated here -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Company Details Sidebar -->
+            <div class="col-lg-4">
+                <div class="sticky-top" style="top: 2rem;">
+                    <!-- Selected Company Details -->
+                    <div class="card border-0 shadow-sm mb-4" id="company-details" style="display: none;">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Detalhes da Empresa
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="company-info">
+                                <!-- Company details will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Financial Ratios -->
+                    <div class="card border-0 shadow-sm mb-4" id="financial-ratios" style="display: none;">
+                        <div class="card-header bg-white border-0">
+                            <h6 class="mb-0">
+                                <i class="fas fa-calculator me-2"></i>
+                                Indicadores Financeiros
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="ratios-content">
+                                <!-- Financial ratios will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Market Ratios -->
+                    <div class="card border-0 shadow-sm mb-4" id="market-ratios" style="display: none;">
+                        <div class="card-header bg-white border-0">
+                            <h6 class="mb-0">
+                                <i class="fas fa-chart-bar me-2"></i>
+                                Múltiplos de Valuation
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="market-ratios-content">
+                                <!-- Market ratios will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Dividends -->
+                    <div class="card border-0 shadow-sm" id="recent-dividends" style="display: none;">
+                        <div class="card-header bg-white border-0">
+                            <h6 class="mb-0">
+                                <i class="fas fa-coins me-2"></i>
+                                Últimos Dividendos
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="dividends-content">
+                                <!-- Dividends will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Company Modal -->
+<div class="modal fade" id="companyModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-building me-2"></i>
+                    <span id="modal-company-name">Detalhes da Empresa</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Tabs -->
+                <ul class="nav nav-tabs mb-3" id="companyTabs">
+                    <li class="nav-item">
+                        <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview">
+                            <i class="fas fa-info me-1"></i>Visão Geral
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="financials-tab" data-bs-toggle="tab" data-bs-target="#financials">
+                            <i class="fas fa-chart-line me-1"></i>Financeiros
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="ratios-tab" data-bs-toggle="tab" data-bs-target="#ratios">
+                            <i class="fas fa-calculator me-1"></i>Indicadores
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="dividends-tab" data-bs-toggle="tab" data-bs-target="#dividends">
+                            <i class="fas fa-coins me-1"></i>Dividendos
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content" id="companyTabContent">
+                    <div class="tab-pane fade show active" id="overview">
+                        <div id="modal-overview-content">
+                            <!-- Company overview will be loaded here -->
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="financials">
+                        <div id="modal-financials-content">
+                            <!-- Financial statements will be loaded here -->
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="ratios">
+                        <div id="modal-ratios-content">
+                            <!-- Ratios will be loaded here -->
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="dividends">
+                        <div id="modal-dividends-content">
+                            <!-- Dividends will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" onclick="downloadCompanyReport()">
+                    <i class="fas fa-download me-1"></i>Relatório PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentPage = 1;
+let currentFilters = {};
+let selectedCompany = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCompaniesPage();
+    loadCompanies();
+    
+    // Setup search input with debounce
+    let searchTimeout;
+    document.getElementById('company-search').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            searchCompanies();
+        }, 500);
+    });
+    
+    // Setup filter change handlers
+    document.getElementById('sector-filter').addEventListener('change', searchCompanies);
+    document.getElementById('segment-filter').addEventListener('change', searchCompanies);
+    
+    // Setup view toggle
+    document.querySelectorAll('[data-view]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('[data-view]').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            toggleView(this.dataset.view);
+        });
+    });
+});
+
+function initializeCompaniesPage() {
+    console.log('Companies page initialized');
+}
+
+function loadCompanies(page = 1) {
+    currentPage = page;
+    
+    // Show loading state
+    document.getElementById('loading-state').style.display = 'block';
+    document.getElementById('companies-table').style.display = 'none';
+    document.getElementById('companies-cards').style.display = 'none';
+    
+    // Build query parameters
+    const params = new URLSearchParams({
+        page: page,
+        limit: 20
+    });
+    
+    // Add filters
+    Object.keys(currentFilters).forEach(key => {
+        if (currentFilters[key]) {
+            params.append(key, currentFilters[key]);
+        }
+    });
+    
+    fetch(`/api/v1/companies?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.data && data.data.companies) {
+                populateCompaniesTable(data.data.companies);
+                updatePagination(data.pagination);
+                updateResultsCount(data.pagination.total_items);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading companies:', error);
+            showErrorState();
+        })
+        .finally(() => {
+            document.getElementById('loading-state').style.display = 'none';
+        });
+}
+
+function searchCompanies() {
+    currentFilters = {
+        sector: document.getElementById('sector-filter').value,
+        segment: document.getElementById('segment-filter').value
+    };
+    
+    const searchTerm = document.getElementById('company-search').value;
+    if (searchTerm) {
+        currentFilters.search = searchTerm;
+    }
+    
+    loadCompanies(1);
+}
+
+function clearFilters() {
+    document.getElementById('company-search').value = '';
+    document.getElementById('sector-filter').value = '';
+    document.getElementById('segment-filter').value = '';
+    currentFilters = {};
+    loadCompanies(1);
+}
+
+function populateCompaniesTable(companies) {
+    const tbody = document.getElementById('companies-tbody');
+    const cardsContainer = document.getElementById('companies-cards');
+    
+    tbody.innerHTML = '';
+    cardsContainer.innerHTML = '';
+    
+    companies.forEach(company => {
+        // Table row
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.onclick = () => selectCompany(company);
+        
+        row.innerHTML = `
+            <td>
+                <div>
+                    <strong>${company.trade_name || company.company_name}</strong>
+                    <small class="text-muted d-block">${company.company_name}</small>
+                </div>
+            </td>
+            <td>
+                <span class="badge bg-light text-dark">${company.b3_sector || 'N/A'}</span>
+            </td>
+            <td>
+                ${company.market_cap ? 
+                    'R$ ' + (company.market_cap / 1000000000).toFixed(1) + 'B' : 
+                    'N/A'
+                }
+            </td>
+            <td>
+                ${company.tickers.map(ticker => 
+                    `<span class="badge bg-primary me-1">${ticker}</span>`
+                ).join('')}
+            </td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); viewCompanyDetails(${company.cvm_code})">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+        
+        // Card
+        const card = document.createElement('div');
+        card.className = 'col-md-6 col-lg-4';
+        card.innerHTML = `
+            <div class="card h-100 border company-card" style="cursor: pointer;" onclick="selectCompany(${JSON.stringify(company).replace(/"/g, '&quot;')})">
+                <div class="card-body">
+                    <h6 class="card-title">${company.trade_name || company.company_name}</h6>
+                    <p class="card-text text-muted small">${company.b3_sector || 'Setor não informado'}</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            ${company.tickers.map(ticker => 
+                                `<span class="badge bg-primary me-1">${ticker}</span>`
+                            ).join('')}
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); viewCompanyDetails(${company.cvm_code})">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        cardsContainer.appendChild(card);
+    });
+    
+    // Show appropriate view
+    const activeView = document.querySelector('[data-view].active').dataset.view;
+    toggleView(activeView);
+}
+
+function toggleView(viewType) {
+    if (viewType === 'table') {
+        document.getElementById('companies-table').style.display = 'block';
+        document.getElementById('companies-cards').style.display = 'none';
+    } else {
+        document.getElementById('companies-table').style.display = 'none';
+        document.getElementById('companies-cards').style.display = 'block';
+    }
+}
+
+function selectCompany(company) {
+    selectedCompany = company;
+    
+    // Update sidebar with company details
+    updateCompanyDetails(company);
+    loadCompanyFinancialData(company.cvm_code);
+}
+
+function updateCompanyDetails(company) {
+    const detailsCard = document.getElementById('company-details');
+    const infoDiv = document.getElementById('company-info');
+    
+    infoDiv.innerHTML = `
+        <h6 class="text-primary">${company.trade_name || company.company_name}</h6>
+        <hr>
+        <div class="row g-2">
+            <div class="col-6">
+                <small class="text-muted">CVM:</small>
+                <div class="fw-bold">${company.cvm_code}</div>
+            </div>
+            <div class="col-6">
+                <small class="text-muted">CNPJ:</small>
+                <div class="fw-bold">${company.cnpj || 'N/A'}</div>
+            </div>
+            <div class="col-12">
+                <small class="text-muted">Setor:</small>
+                <div class="fw-bold">${company.b3_sector || 'N/A'}</div>
+            </div>
+            <div class="col-12">
+                <small class="text-muted">Segmento:</small>
+                <div class="fw-bold">${company.b3_listing_segment || 'N/A'}</div>
+            </div>
+            <div class="col-12">
+                <small class="text-muted">Website:</small>
+                <div>
+                    ${company.website ? 
+                        `<a href="${company.website}" target="_blank" class="text-decoration-none">
+                            <i class="fas fa-external-link-alt me-1"></i>Acessar
+                        </a>` : 'N/A'
+                    }
+                </div>
+            </div>
+        </div>
+    `;
+    
+    detailsCard.style.display = 'block';
+}
+
+function loadCompanyFinancialData(cvmCode) {
+    // Load financial ratios
+    fetch(`/api/v1/companies/${cvmCode}/financial-ratios`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.data) {
+                updateFinancialRatios(data.data);
+            }
+        })
+        .catch(error => console.error('Error loading financial ratios:', error));
+    
+    // Load market ratios
+    fetch(`/api/v1/companies/${cvmCode}/market-ratios`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.data) {
+                updateMarketRatios(data.data);
+            }
+        })
+        .catch(error => console.error('Error loading market ratios:', error));
+    
+    // Load dividends
+    fetch(`/api/v1/companies/${cvmCode}/dividends`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.data && data.data.dividends) {
+                updateDividends(data.data.dividends);
+            }
+        })
+        .catch(error => console.error('Error loading dividends:', error));
+}
+
+function updateFinancialRatios(ratios) {
+    const ratiosCard = document.getElementById('financial-ratios');
+    const content = document.getElementById('ratios-content');
+    
+    content.innerHTML = `
+        <div class="row g-2">
+            <div class="col-6">
+                <small class="text-muted">Liquidez Corrente:</small>
+                <div class="fw-bold">${ratios.liquidity_ratios?.current_ratio?.toFixed(2) || 'N/A'}</div>
+            </div>
+            <div class="col-6">
+                <small class="text-muted">ROE:</small>
+                <div class="fw-bold">${ratios.profitability_ratios?.roe ? (ratios.profitability_ratios.roe * 100).toFixed(1) + '%' : 'N/A'}</div>
+            </div>
+            <div class="col-6">
+                <small class="text-muted">Dívida/Patrimônio:</small>
+                <div class="fw-bold">${ratios.leverage_ratios?.debt_to_equity?.toFixed(2) || 'N/A'}</div>
+            </div>
+            <div class="col-6">
+                <small class="text-muted">Margem Líquida:</small>
+                <div class="fw-bold">${ratios.profitability_ratios?.net_margin ? (ratios.profitability_ratios.net_margin * 100).toFixed(1) + '%' : 'N/A'}</div>
+            </div>
+        </div>
+        <div class="mt-2">
+            <small class="text-muted">Ref: ${new Date(ratios.reference_date).toLocaleDateString('pt-BR')}</small>
+        </div>
+    `;
+    
+    ratiosCard.style.display = 'block';
+}
+
+function updateMarketRatios(ratios) {
+    const marketCard = document.getElementById('market-ratios');
+    const content = document.getElementById('market-ratios-content');
+    
+    content.innerHTML = `
+        <div class="row g-2">
+            <div class="col-6">
+                <small class="text-muted">P/L:</small>
+                <div class="fw-bold">${ratios.valuation_ratios?.pe_ratio?.toFixed(1) || 'N/A'}</div>
+            </div>
+            <div class="col-6">
+                <small class="text-muted">P/VP:</small>
+                <div class="fw-bold">${ratios.valuation_ratios?.pb_ratio?.toFixed(1) || 'N/A'}</div>
+            </div>
+            <div class="col-6">
+                <small class="text-muted">EV/EBITDA:</small>
+                <div class="fw-bold">${ratios.valuation_ratios?.ev_ebitda?.toFixed(1) || 'N/A'}</div>
+            </div>
+            <div class="col-6">
+                <small class="text-muted">DY:</small>
+                <div class="fw-bold">${ratios.per_share_data?.dividend_per_share ? (ratios.per_share_data.dividend_per_share * 100).toFixed(1) + '%' : 'N/A'}</div>
+            </div>
+        </div>
+    `;
+    
+    marketCard.style.display = 'block';
+}
+
+function updateDividends(dividends) {
+    const dividendsCard = document.getElementById('recent-dividends');
+    const content = document.getElementById('dividends-content');
+    
+    const recentDividends = dividends.slice(0, 3);
+    
+    content.innerHTML = recentDividends.map(dividend => `
+        <div class="border-bottom py-2">
+            <div class="d-flex justify-content-between">
+                <span class="fw-bold">${dividend.ticker}</span>
+                <span class="text-success">R$ ${dividend.amount_per_share.toFixed(2)}</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <small class="text-muted">${dividend.type.toUpperCase()}</small>
+                <small class="text-muted">${new Date(dividend.ex_date).toLocaleDateString('pt-BR')}</small>
+            </div>
+        </div>
+    `).join('') || '<p class="text-muted">Nenhum dividendo recente</p>';
+    
+    dividendsCard.style.display = 'block';
+}
+
+function updatePagination(pagination) {
+    const paginationEl = document.getElementById('pagination');
+    paginationEl.innerHTML = '';
+    
+    if (pagination.total_pages <= 1) return;
+    
+    // Previous button
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${pagination.current_page === 1 ? 'disabled' : ''}`;
+    prevLi.innerHTML = `<a class="page-link" href="#" onclick="loadCompanies(${pagination.current_page - 1})">Anterior</a>`;
+    paginationEl.appendChild(prevLi);
+    
+    // Page numbers
+    const startPage = Math.max(1, pagination.current_page - 2);
+    const endPage = Math.min(pagination.total_pages, pagination.current_page + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === pagination.current_page ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#" onclick="loadCompanies(${i})">${i}</a>`;
+        paginationEl.appendChild(li);
+    }
+    
+    // Next button
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${pagination.current_page === pagination.total_pages ? 'disabled' : ''}`;
+    nextLi.innerHTML = `<a class="page-link" href="#" onclick="loadCompanies(${pagination.current_page + 1})">Próximo</a>`;
+    paginationEl.appendChild(nextLi);
+}
+
+function updateResultsCount(total) {
+    document.getElementById('results-count').textContent = `${total} empresas encontradas`;
+}
+
+function viewCompanyDetails(cvmCode) {
+    // Load detailed company information for modal
+    fetch(`/api/v1/companies/${cvmCode}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.data) {
+                openCompanyModal(data.data);
+            }
+        })
+        .catch(error => console.error('Error loading company details:', error));
+}
+
+function openCompanyModal(company) {
+    document.getElementById('modal-company-name').textContent = company.trade_name || company.company_name;
+    
+    // Load modal content
+    loadModalOverview(company);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('companyModal'));
+    modal.show();
+}
+
+function loadModalOverview(company) {
+    const content = document.getElementById('modal-overview-content');
+    
+    content.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Informações Básicas</h6>
+                <table class="table table-sm">
+                    <tr><td>Razão Social:</td><td>${company.company_name}</td></tr>
+                    <tr><td>Nome de Pregão:</td><td>${company.trade_name || 'N/A'}</td></tr>
+                    <tr><td>CNPJ:</td><td>${company.cnpj || 'N/A'}</td></tr>
+                    <tr><td>Código CVM:</td><td>${company.cvm_code}</td></tr>
+                    <tr><td>Data de Fundação:</td><td>${company.founded_date ? new Date(company.founded_date).toLocaleDateString('pt-BR') : 'N/A'}</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Classificação B3</h6>
+                <table class="table table-sm">
+                    <tr><td>Setor:</td><td>${company.b3_sector || 'N/A'}</td></tr>
+                    <tr><td>Subsetor:</td><td>${company.b3_subsector || 'N/A'}</td></tr>
+                    <tr><td>Segmento:</td><td>${company.b3_segment || 'N/A'}</td></tr>
+                    <tr><td>Nível de Listagem:</td><td>${company.b3_listing_segment || 'N/A'}</td></tr>
+                    <tr><td>Número de Funcionários:</td><td>${company.employee_count || 'N/A'}</td></tr>
+                </table>
+            </div>
+        </div>
+        ${company.about ? `
+            <div class="mt-3">
+                <h6>Sobre a Empresa</h6>
+                <p class="text-muted">${company.about}</p>
+            </div>
+        ` : ''}
+    `;
+}
+
+function showErrorState() {
+    const tbody = document.getElementById('companies-tbody');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">Erro ao carregar empresas. Tente novamente.</td></tr>';
+    document.getElementById('companies-table').style.display = 'block';
+}
+
+function downloadCompanyReport() {
+    if (selectedCompany) {
+        alert('Funcionalidade de download de relatório em desenvolvimento');
+    }
+}
+</script>
+{% endblock %}

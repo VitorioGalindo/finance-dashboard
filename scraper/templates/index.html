@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Financeira Brasileira - Demonstração</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1f3a93;
+            --secondary-color: #28a745;
+            --accent-color: #ffc107;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .hero-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            margin: 2rem 0;
+            padding: 3rem;
+        }
+        
+        .api-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: none;
+            margin-bottom: 2rem;
+        }
+        
+        .api-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        }
+        
+        .endpoint-badge {
+            background: var(--primary-color);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+        
+        .status-badge {
+            background: var(--secondary-color);
+            color: white;
+            padding: 0.2rem 0.6rem;
+            border-radius: 15px;
+            font-size: 0.75rem;
+        }
+        
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .stats-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            display: block;
+        }
+        
+        .btn-test-api {
+            background: var(--accent-color);
+            border: none;
+            color: #333;
+            font-weight: bold;
+            border-radius: 25px;
+            padding: 0.5rem 1.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-test-api:hover {
+            background: #e0a800;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Hero Section -->
+        <div class="hero-section text-center">
+            <h1 class="display-4 fw-bold text-primary mb-3">
+                <i class="fas fa-chart-line me-3"></i>
+                API Financeira Brasileira
+            </h1>
+            <p class="lead text-muted mb-4">
+                Acesso completo aos dados do mercado financeiro brasileiro em uma única API.
+                <strong>190 empresas reais</strong> da CVM e <strong>20 notícias atuais</strong> já carregadas!
+            </p>
+            <div class="row justify-content-center">
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card">
+                        <span class="stats-number" id="company-count">190</span>
+                        <small>Empresas</small>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card">
+                        <span class="stats-number">68</span>
+                        <small>Endpoints</small>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card">
+                        <span class="stats-number" id="news-count">20</span>
+                        <small>Notícias</small>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card">
+                        <span class="stats-number">100%</span>
+                        <small>Dados Reais</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Endpoints Demo -->
+        <div class="row">
+            <!-- Companies API -->
+            <div class="col-lg-6 mb-4">
+                <div class="card api-card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-building me-2"></i>
+                            API de Empresas
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="endpoint-badge">GET /api/v1/companies</span>
+                            <span class="status-badge">
+                                <i class="fas fa-check me-1"></i>Ativo
+                            </span>
+                        </div>
+                        <p class="text-muted mb-3">
+                            Dados completos de 190 empresas brasileiras registradas na CVM
+                        </p>
+                        <button class="btn btn-test-api" onclick="testCompaniesAPI()">
+                            <i class="fas fa-play me-2"></i>Testar API
+                        </button>
+                        <div id="companies-result" class="mt-3" style="display: none;">
+                            <h6>Resultado:</h6>
+                            <div class="code-block" id="companies-data"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- News API -->
+            <div class="col-lg-6 mb-4">
+                <div class="card api-card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-newspaper me-2"></i>
+                            API de Notícias
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="endpoint-badge">GET /api/v1/news</span>
+                            <span class="status-badge">
+                                <i class="fas fa-check me-1"></i>Ativo
+                            </span>
+                        </div>
+                        <p class="text-muted mb-3">
+                            Notícias financeiras atuais com análise de sentimento automática
+                        </p>
+                        <button class="btn btn-test-api" onclick="testNewsAPI()">
+                            <i class="fas fa-play me-2"></i>Testar API
+                        </button>
+                        <div id="news-result" class="mt-3" style="display: none;">
+                            <h6>Resultado:</h6>
+                            <div class="code-block" id="news-data"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real Data Examples -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card api-card">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-database me-2"></i>
+                            Exemplos de Dados Reais
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-primary">
+                                    <i class="fas fa-building me-2"></i>Empresas da CVM
+                                </h6>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        <span>2W ECOBANK S.A.</span>
+                                        <small class="text-muted">CVM: 25224</small>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        <span>3A COMPANHIA SECURITIZADORA</span>
+                                        <small class="text-muted">CVM: 21954</small>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        <span>521 PARTICIPAÇÕES S.A.</span>
+                                        <small class="text-muted">CVM: 16330</small>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-success">
+                                    <i class="fas fa-newspaper me-2"></i>Notícias Atuais
+                                </h6>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item">
+                                        <strong>EUA e União Europeia fecham acordo</strong>
+                                        <br><small class="text-muted">G1 Economia - 27/07/2025</small>
+                                    </li>
+                                    <li class="list-group-item">
+                                        <strong>Tarifaço de Trump: EUA anunciam acordo</strong>
+                                        <br><small class="text-muted">G1 Economia - 27/07/2025</small>
+                                    </li>
+                                    <li class="list-group-item">
+                                        <strong>Açaí brasileiro pode virar luxo</strong>
+                                        <br><small class="text-muted">G1 Economia - 27/07/2025</small>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Documentation -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card api-card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-code me-2"></i>
+                            Como Usar a API
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>1. Autenticação</h6>
+                        <div class="code-block mb-3">
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     "http://localhost:5000/api/v1/companies"
+                        </div>
+                        
+                        <h6>2. Principais Endpoints</h6>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Endpoint</th>
+                                        <th>Descrição</th>
+                                        <th>Dados</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>/api/v1/companies</code></td>
+                                        <td>Lista todas as empresas</td>
+                                        <td>190 empresas reais da CVM</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>/api/v1/news</code></td>
+                                        <td>Notícias financeiras</td>
+                                        <td>20 notícias atuais</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>/api/v1/companies/search?query=PETROBRAS</code></td>
+                                        <td>Busca empresas</td>
+                                        <td>Busca inteligente</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>/api/v1/companies/{cvm_code}</code></td>
+                                        <td>Detalhes de empresa</td>
+                                        <td>Informações completas</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_KEY = 'test_key_f119e10704599dff81182d87e87a320a';
+        const BASE_URL = 'http://localhost:5000/api/v1';
+
+        async function testCompaniesAPI() {
+            const button = document.querySelector('button[onclick="testCompaniesAPI()"]');
+            const resultDiv = document.getElementById('companies-result');
+            const dataDiv = document.getElementById('companies-data');
+            
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Carregando...';
+            button.disabled = true;
+            
+            try {
+                const response = await fetch(`${BASE_URL}/companies?limit=3`, {
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`
+                    }
+                });
+                
+                const data = await response.json();
+                dataDiv.innerHTML = JSON.stringify(data, null, 2);
+                resultDiv.style.display = 'block';
+                
+                // Update company count
+                if (data.pagination) {
+                    document.getElementById('company-count').textContent = data.pagination.total_items;
+                }
+                
+                button.innerHTML = '<i class="fas fa-check me-2"></i>Testado!';
+                button.className = 'btn btn-success';
+                
+            } catch (error) {
+                dataDiv.innerHTML = `Erro: ${error.message}`;
+                resultDiv.style.display = 'block';
+                button.innerHTML = '<i class="fas fa-times me-2"></i>Erro';
+                button.className = 'btn btn-danger';
+            }
+            
+            button.disabled = false;
+        }
+
+        async function testNewsAPI() {
+            const button = document.querySelector('button[onclick="testNewsAPI()"]');
+            const resultDiv = document.getElementById('news-result');
+            const dataDiv = document.getElementById('news-data');
+            
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Carregando...';
+            button.disabled = true;
+            
+            try {
+                const response = await fetch(`${BASE_URL}/news?limit=2`, {
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`
+                    }
+                });
+                
+                const data = await response.json();
+                dataDiv.innerHTML = JSON.stringify(data, null, 2);
+                resultDiv.style.display = 'block';
+                
+                button.innerHTML = '<i class="fas fa-check me-2"></i>Testado!';
+                button.className = 'btn btn-success';
+                
+            } catch (error) {
+                dataDiv.innerHTML = `Erro: ${error.message}`;
+                resultDiv.style.display = 'block';
+                button.innerHTML = '<i class="fas fa-times me-2"></i>Erro';
+                button.className = 'btn btn-danger';
+            }
+            
+            button.disabled = false;
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('API Financeira Brasileira carregada com sucesso!');
+        });
+    </script>
+</body>
+</html>

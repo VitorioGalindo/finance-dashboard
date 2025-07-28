@@ -1,0 +1,820 @@
+{% extends "base.html" %}
+
+{% block title %}Indicadores Macroeconômicos - API Mercado Brasil{% endblock %}
+
+{% block content %}
+<!-- Macro Header -->
+<section class="py-4 bg-light">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="h3 mb-2">
+                    <i class="fas fa-globe me-2 text-primary"></i>
+                    Indicadores Macroeconômicos
+                </h1>
+                <p class="text-muted mb-0">
+                    Dados econômicos do Brasil: SELIC, IPCA, PIB, câmbio, expectativas e curvas de juros
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="fas fa-download me-1"></i>Exportar Dados
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="exportIndicators('csv')">CSV</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportIndicators('excel')">Excel</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportIndicators('pdf')">PDF</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Key Indicators -->
+<section class="py-3 border-bottom">
+    <div class="container">
+        <div class="row g-3">
+            <div class="col-md-2">
+                <div class="text-center">
+                    <h6 class="text-muted mb-1">SELIC</h6>
+                    <h4 class="mb-1" id="selic-rate">11.75%</h4>
+                    <span class="badge bg-secondary" id="selic-status">Estável</span>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="text-center">
+                    <h6 class="text-muted mb-1">IPCA (12m)</h6>
+                    <h4 class="mb-1" id="ipca-rate">4.50%</h4>
+                    <span class="badge bg-warning" id="ipca-change">+0.1pp</span>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="text-center">
+                    <h6 class="text-muted mb-1">IGP-M (12m)</h6>
+                    <h4 class="mb-1" id="igpm-rate">4.20%</h4>
+                    <span class="badge bg-info" id="igpm-change">-0.2pp</span>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="text-center">
+                    <h6 class="text-muted mb-1">PIB (anual)</h6>
+                    <h4 class="mb-1" id="pib-rate">2.10%</h4>
+                    <span class="badge bg-success" id="pib-change">+0.3pp</span>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="text-center">
+                    <h6 class="text-muted mb-1">USD/BRL</h6>
+                    <h4 class="mb-1" id="usd-brl-rate">5.20</h4>
+                    <span class="badge bg-danger" id="usd-brl-change">+0.15</span>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="text-center">
+                    <h6 class="text-muted mb-1">Desemprego</h6>
+                    <h4 class="mb-1" id="unemployment-rate">7.8%</h4>
+                    <span class="badge bg-success" id="unemployment-change">-0.5pp</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-4">
+    <div class="container">
+        <div class="row g-4">
+            <!-- Charts Section -->
+            <div class="col-lg-8">
+                <!-- Indicators Chart -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>
+                            Evolução dos Indicadores
+                        </h5>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-primary active" data-chart="inflation">Inflação</button>
+                            <button type="button" class="btn btn-outline-primary" data-chart="interest">Juros</button>
+                            <button type="button" class="btn btn-outline-primary" data-chart="growth">PIB</button>
+                            <button type="button" class="btn btn-outline-primary" data-chart="exchange">Câmbio</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="indicators-chart" height="350"></canvas>
+                    </div>
+                </div>
+
+                <!-- Yield Curve -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-bezier-curve me-2"></i>
+                            Curva de Juros DI Futuro
+                        </h5>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-primary active" onclick="loadYieldCurve('current')">Atual</button>
+                            <button type="button" class="btn btn-outline-primary" onclick="loadYieldCurve('comparison')">Comparação</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="yield-curve-chart" height="300"></canvas>
+                    </div>
+                </div>
+
+                <!-- Economic Calendar -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calendar-alt me-2"></i>
+                            Calendário Econômico
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="economic-calendar">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Evento</th>
+                                        <th>Anterior</th>
+                                        <th>Previsão</th>
+                                        <th>Impacto</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="calendar-tbody">
+                                    <!-- Economic events will be populated here -->
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4">
+                                            <div class="spinner-border text-primary me-2"></div>
+                                            Carregando eventos...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Focus Report -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-bullseye me-2"></i>
+                            Boletim Focus
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="focus-report-content">
+                            <!-- Focus report data will be populated here -->
+                            <div class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm text-primary"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Market Expectations -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0">
+                        <h6 class="mb-0">
+                            <i class="fas fa-crystal-ball me-2"></i>
+                            Expectativas de Mercado
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="expectations-content">
+                            <!-- Market expectations will be populated here -->
+                            <div class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm text-primary"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exchange Rates -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0">
+                        <h6 class="mb-0">
+                            <i class="fas fa-exchange-alt me-2"></i>
+                            Taxas de Câmbio
+                        </h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0" id="exchange-rates-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Par</th>
+                                        <th>Taxa</th>
+                                        <th>Var%</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="exchange-tbody">
+                                    <!-- Exchange rates will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Commodities -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0">
+                        <h6 class="mb-0">
+                            <i class="fas fa-seedling me-2"></i>
+                            Commodities
+                        </h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0" id="commodities-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Commodity</th>
+                                        <th>Preço</th>
+                                        <th>Var%</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="commodities-tbody">
+                                    <!-- Commodities will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Indicator Details Modal -->
+<div class="modal fade" id="indicatorModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-chart-bar me-2"></i>
+                    <span id="modal-indicator-name">Detalhes do Indicador</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <canvas id="modal-indicator-chart" height="300"></canvas>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Informações</h6>
+                        <div id="modal-indicator-info">
+                            <!-- Indicator info will be populated here -->
+                        </div>
+                        
+                        <h6 class="mt-4">Dados Históricos</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Valor</th>
+                                        <th>Var</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="modal-historical-data">
+                                    <!-- Historical data will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" onclick="downloadIndicatorData()">
+                    <i class="fas fa-download me-1"></i>Download Dados
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let indicatorsChart = null;
+let yieldCurveChart = null;
+let modalChart = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeMacroPage();
+    loadMacroIndicators();
+    loadFocusReport();
+    loadMarketExpectations();
+    loadExchangeRates();
+    loadCommodities();
+    loadEconomicCalendar();
+    loadYieldCurve('current');
+    
+    // Setup chart controls
+    setupChartControls();
+});
+
+function initializeMacroPage() {
+    console.log('Macro page initialized');
+}
+
+function setupChartControls() {
+    document.querySelectorAll('[data-chart]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('[data-chart]').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            loadIndicatorsChart(this.dataset.chart);
+        });
+    });
+}
+
+function loadMacroIndicators() {
+    fetch('/api/v1/macroeconomics/indicators')
+        .then(response => response.json())
+        .then(data => {
+            if (data.data && data.data.indicators) {
+                updateMainIndicators(data.data.indicators);
+                loadIndicatorsChart('inflation');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading macro indicators:', error);
+            showIndicatorsError();
+        });
+}
+
+function updateMainIndicators(indicators) {
+    indicators.forEach(indicator => {
+        switch(indicator.indicator_code) {
+            case 'SELIC':
+                document.getElementById('selic-rate').textContent = `${indicator.value}%`;
+                updateChangeIndicator('selic-status', indicator.change, 'Estável');
+                break;
+            case 'IPCA':
+                document.getElementById('ipca-rate').textContent = `${indicator.value}%`;
+                updateChangeIndicator('ipca-change', indicator.change);
+                break;
+            case 'IGP_M':
+                document.getElementById('igpm-rate').textContent = `${indicator.value}%`;
+                updateChangeIndicator('igpm-change', indicator.change);
+                break;
+            case 'PIB':
+                document.getElementById('pib-rate').textContent = `${indicator.value}%`;
+                updateChangeIndicator('pib-change', indicator.change);
+                break;
+            case 'CAMBIO':
+                document.getElementById('usd-brl-rate').textContent = indicator.value.toFixed(2);
+                updateChangeIndicator('usd-brl-change', indicator.change);
+                break;
+        }
+    });
+}
+
+function updateChangeIndicator(elementId, change, defaultText = null) {
+    const element = document.getElementById(elementId);
+    
+    if (change === null || change === undefined) {
+        if (defaultText) {
+            element.textContent = defaultText;
+            element.className = 'badge bg-secondary';
+        }
+        return;
+    }
+    
+    const changeText = change >= 0 ? `+${change.toFixed(2)}pp` : `${change.toFixed(2)}pp`;
+    const changeClass = change >= 0 ? 'bg-success' : change < 0 ? 'bg-danger' : 'bg-secondary';
+    
+    element.textContent = changeText;
+    element.className = `badge ${changeClass}`;
+}
+
+function loadIndicatorsChart(chartType) {
+    // This would load different chart data based on the selected type
+    const ctx = document.getElementById('indicators-chart').getContext('2d');
+    
+    if (indicatorsChart) {
+        indicatorsChart.destroy();
+    }
+    
+    // Mock data for demonstration - in real implementation, this would come from API
+    const chartData = getChartDataByType(chartType);
+    
+    indicatorsChart = new Chart(ctx, {
+        type: 'line',
+        data: chartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
+            scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Período'
+                    }
+                },
+                y: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Taxa (%)'
+                    }
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            }
+        }
+    });
+}
+
+function getChartDataByType(chartType) {
+    // Generate sample data - in real implementation, this would come from API
+    const labels = Array.from({length: 12}, (_, i) => {
+        const date = new Date();
+        date.setMonth(date.getMonth() - (11 - i));
+        return date.toLocaleDateString('pt-BR', {month: 'short', year: 'numeric'});
+    });
+    
+    switch(chartType) {
+        case 'inflation':
+            return {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'IPCA',
+                        data: [4.2, 4.5, 4.8, 5.1, 4.9, 4.7, 4.5, 4.3, 4.1, 4.2, 4.4, 4.5],
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        tension: 0.1
+                    },
+                    {
+                        label: 'IGP-M',
+                        data: [3.8, 4.1, 4.4, 4.7, 4.5, 4.3, 4.1, 3.9, 3.8, 4.0, 4.1, 4.2],
+                        borderColor: '#fd7e14',
+                        backgroundColor: 'rgba(253, 126, 20, 0.1)',
+                        tension: 0.1
+                    }
+                ]
+            };
+        case 'interest':
+            return {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'SELIC',
+                        data: [13.75, 13.25, 12.75, 12.25, 11.75, 11.75, 11.75, 11.75, 11.75, 11.75, 11.75, 11.75],
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        tension: 0.1
+                    }
+                ]
+            };
+        case 'growth':
+            return {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'PIB (% a.a.)',
+                        data: [1.2, 1.5, 1.8, 2.1, 2.3, 2.1, 1.9, 1.7, 1.8, 2.0, 2.1, 2.1],
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        tension: 0.1
+                    }
+                ]
+            };
+        case 'exchange':
+            return {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'USD/BRL',
+                        data: [5.8, 5.6, 5.4, 5.2, 5.1, 5.0, 5.1, 5.2, 5.3, 5.2, 5.1, 5.2],
+                        borderColor: '#6f42c1',
+                        backgroundColor: 'rgba(111, 66, 193, 0.1)',
+                        tension: 0.1
+                    }
+                ]
+            };
+        default:
+            return {labels: [], datasets: []};
+    }
+}
+
+function loadYieldCurve(type) {
+    fetch('/api/v1/macroeconomics/yield-curves')
+        .then(response => response.json())
+        .then(data => {
+            if (data.data && data.data.curves) {
+                createYieldCurveChart(data.data.curves[0]);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading yield curve:', error);
+            showYieldCurveError();
+        });
+}
+
+function createYieldCurveChart(curveData) {
+    const ctx = document.getElementById('yield-curve-chart').getContext('2d');
+    
+    if (yieldCurveChart) {
+        yieldCurveChart.destroy();
+    }
+    
+    const labels = curveData.points.map(point => `${point.days_to_maturity}d`);
+    const rates = curveData.points.map(point => point.rate);
+    
+    yieldCurveChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Taxa DI (%)',
+                data: rates,
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.1,
+                pointRadius: 6,
+                pointHoverRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            const point = curveData.points[context[0].dataIndex];
+                            return `Vencimento: ${point.contract}`;
+                        },
+                        label: function(context) {
+                            return `Taxa: ${context.parsed.y.toFixed(2)}% a.a.`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Prazo de Vencimento'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Taxa (% a.a.)'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value.toFixed(1) + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function loadFocusReport() {
+    fetch('/api/v1/macroeconomics/focus-report')
+        .then(response => response.json())
+        .then(data => {
+            if (data.data) {
+                updateFocusReport(data.data);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading Focus report:', error);
+            document.getElementById('focus-report-content').innerHTML = 
+                '<p class="text-danger text-center">Erro ao carregar Boletim Focus</p>';
+        });
+}
+
+function updateFocusReport(focusData) {
+    const content = document.getElementById('focus-report-content');
+    
+    content.innerHTML = `
+        <div class="row g-3">
+            <div class="col-6">
+                <div class="text-center">
+                    <small class="text-muted">SELIC ${new Date().getFullYear()}</small>
+                    <div class="fw-bold">${focusData.indicators.selic.current_year.median}%</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="text-center">
+                    <small class="text-muted">IPCA ${new Date().getFullYear()}</small>
+                    <div class="fw-bold">${focusData.indicators.ipca.current_year.median}%</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="text-center">
+                    <small class="text-muted">PIB ${new Date().getFullYear()}</small>
+                    <div class="fw-bold">${focusData.indicators.pib.current_year.median}%</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="text-center">
+                    <small class="text-muted">Câmbio ${new Date().getFullYear()}</small>
+                    <div class="fw-bold">R$ ${focusData.indicators.exchange_rate.current_year.median}</div>
+                </div>
+            </div>
+        </div>
+        <hr>
+        <div class="text-center">
+            <small class="text-muted">Última atualização: ${new Date(focusData.report_date).toLocaleDateString('pt-BR')}</small>
+        </div>
+    `;
+}
+
+function loadMarketExpectations() {
+    fetch('/api/v1/macroeconomics/expectations')
+        .then(response => response.json())
+        .then(data => {
+            if (data.data && data.data.expectations) {
+                updateMarketExpectations(data.data.expectations);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading market expectations:', error);
+            document.getElementById('expectations-content').innerHTML = 
+                '<p class="text-danger text-center">Erro ao carregar expectativas</p>';
+        });
+}
+
+function updateMarketExpectations(expectations) {
+    const content = document.getElementById('expectations-content');
+    
+    content.innerHTML = expectations.map(exp => `
+        <div class="border-bottom py-2">
+            <div class="d-flex justify-content-between align-items-center">
+                <strong>${exp.indicator}</strong>
+                <span class="badge bg-light text-dark">${exp.total_responses} respostas</span>
+            </div>
+            <div class="row mt-1">
+                <div class="col-4">
+                    <small class="text-muted">Mediana:</small>
+                    <div class="fw-bold">${exp.median}%</div>
+                </div>
+                <div class="col-4">
+                    <small class="text-muted">Média:</small>
+                    <div class="fw-bold">${exp.mean}%</div>
+                </div>
+                <div class="col-4">
+                    <small class="text-muted">Desvio:</small>
+                    <div class="fw-bold">${exp.standard_deviation}</div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function loadExchangeRates() {
+    fetch('/api/v1/macroeconomics/exchange-rates')
+        .then(response => response.json())
+        .then(data => {
+            if (data.data && data.data.exchange_rates) {
+                updateExchangeRates(data.data.exchange_rates.slice(0, 5));
+            }
+        })
+        .catch(error => {
+            console.error('Error loading exchange rates:', error);
+            document.getElementById('exchange-tbody').innerHTML = 
+                '<tr><td colspan="3" class="text-center text-danger">Erro ao carregar câmbio</td></tr>';
+        });
+}
+
+function updateExchangeRates(rates) {
+    const tbody = document.getElementById('exchange-tbody');
+    tbody.innerHTML = '';
+    
+    rates.forEach(rate => {
+        const row = document.createElement('tr');
+        const changeClass = rate.variation >= 0 ? 'text-success' : 'text-danger';
+        
+        row.innerHTML = `
+            <td><strong>${rate.currency_pair}</strong></td>
+            <td>${rate.rate.toFixed(4)}</td>
+            <td class="${changeClass}">
+                ${rate.variation_percent >= 0 ? '+' : ''}${rate.variation_percent.toFixed(2)}%
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+}
+
+function loadCommodities() {
+    fetch('/api/v1/macroeconomics/commodities')
+        .then(response => response.json())
+        .then(data => {
+            if (data.data && data.data.commodities) {
+                updateCommodities(data.data.commodities);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading commodities:', error);
+            document.getElementById('commodities-tbody').innerHTML = 
+                '<tr><td colspan="3" class="text-center text-danger">Erro ao carregar commodities</td></tr>';
+        });
+}
+
+function updateCommodities(commodities) {
+    const tbody = document.getElementById('commodities-tbody');
+    tbody.innerHTML = '';
+    
+    commodities.forEach(commodity => {
+        const row = document.createElement('tr');
+        const changeClass = commodity.change_percent >= 0 ? 'text-success' : 'text-danger';
+        
+        row.innerHTML = `
+            <td>
+                <strong>${commodity.name}</strong>
+                <small class="text-muted d-block">${commodity.symbol}</small>
+            </td>
+            <td>$${commodity.price.toFixed(2)}</td>
+            <td class="${changeClass}">
+                ${commodity.change_percent >= 0 ? '+' : ''}${commodity.change_percent.toFixed(2)}%
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+}
+
+function loadEconomicCalendar() {
+    // This would load from the actual API endpoint
+    // For now, showing structure
+    const tbody = document.getElementById('calendar-tbody');
+    tbody.innerHTML = `
+        <tr>
+            <td>22/01</td>
+            <td>Reunião COPOM</td>
+            <td>11.75%</td>
+            <td>11.75%</td>
+            <td><i class="fas fa-circle text-danger"></i></td>
+        </tr>
+        <tr>
+            <td>25/01</td>
+            <td>IPCA (dez)</td>
+            <td>0.56%</td>
+            <td>0.45%</td>
+            <td><i class="fas fa-circle text-warning"></i></td>
+        </tr>
+    `;
+}
+
+function showIndicatorsError() {
+    document.getElementById('selic-rate').textContent = 'N/A';
+    document.getElementById('ipca-rate').textContent = 'N/A';
+    document.getElementById('igpm-rate').textContent = 'N/A';
+    document.getElementById('pib-rate').textContent = 'N/A';
+    document.getElementById('usd-brl-rate').textContent = 'N/A';
+}
+
+function showYieldCurveError() {
+    const ctx = document.getElementById('yield-curve-chart').getContext('2d');
+    ctx.font = '16px Arial';
+    ctx.fillStyle = '#dc3545';
+    ctx.textAlign = 'center';
+    ctx.fillText('Erro ao carregar curva de juros', ctx.canvas.width / 2, ctx.canvas.height / 2);
+}
+
+function exportIndicators(format) {
+    alert(`Exportação em formato ${format.toUpperCase()} em desenvolvimento`);
+}
+
+function downloadIndicatorData() {
+    alert('Download de dados históricos em desenvolvimento');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,1065 @@
+{% extends "base.html" %}
+
+{% block title %}Documentação da API - API Mercado Brasil{% endblock %}
+
+{% block content %}
+<!-- Documentation Header -->
+<section class="py-5 bg-gradient-primary text-white">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1 class="display-5 fw-bold mb-4">
+                    <i class="fas fa-book me-3"></i>
+                    Documentação da API
+                </h1>
+                <p class="lead mb-4">
+                    Guia completo para integrar dados financeiros brasileiros em suas aplicações.
+                    68 endpoints organizados em 7 módulos principais.
+                </p>
+                <div class="d-flex gap-3 flex-wrap">
+                    <a href="#quick-start" class="btn btn-light btn-lg">
+                        <i class="fas fa-rocket me-2"></i>Início Rápido
+                    </a>
+                    <a href="#endpoints" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-list me-2"></i>Endpoints
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-4 text-center">
+                <div class="bg-white text-dark p-4 rounded shadow">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h3 class="text-primary mb-1">68</h3>
+                            <small class="text-muted">Endpoints</small>
+                        </div>
+                        <div class="col-6">
+                            <h3 class="text-success mb-1">REST</h3>
+                            <small class="text-muted">API</small>
+                        </div>
+                        <div class="col-6 mt-3">
+                            <h3 class="text-info mb-1">JSON</h3>
+                            <small class="text-muted">Formato</small>
+                        </div>
+                        <div class="col-6 mt-3">
+                            <h3 class="text-warning mb-1">WebSocket</h3>
+                            <small class="text-muted">Real-time</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Quick Start -->
+<section class="py-5" id="quick-start">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12 text-center mb-5">
+                <h2 class="h1 mb-3">Início Rápido</h2>
+                <p class="lead text-muted">
+                    Em 3 passos simples você já estará consumindo dados financeiros
+                </p>
+            </div>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="text-center">
+                    <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                        <span class="fs-4 fw-bold">1</span>
+                    </div>
+                    <h5>Obtenha sua API Key</h5>
+                    <p class="text-muted">
+                        Registre-se gratuitamente e receba sua chave de autenticação
+                    </p>
+                    <button class="btn btn-outline-primary" onclick="generateApiKey()">
+                        <i class="fas fa-key me-1"></i>Gerar API Key
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center">
+                    <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                        <span class="fs-4 fw-bold">2</span>
+                    </div>
+                    <h5>Faça sua primeira requisição</h5>
+                    <p class="text-muted">
+                        Use cURL, Python, JavaScript ou qualquer linguagem
+                    </p>
+                    <button class="btn btn-outline-success" onclick="showExample()">
+                        <i class="fas fa-code me-1"></i>Ver Exemplo
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center">
+                    <div class="bg-info text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                        <span class="fs-4 fw-bold">3</span>
+                    </div>
+                    <h5>Integre em sua aplicação</h5>
+                    <p class="text-muted">
+                        Utilize os dados em dashboards, apps ou sistemas
+                    </p>
+                    <button class="btn btn-outline-info" onclick="showIntegration()">
+                        <i class="fas fa-puzzle-piece me-1"></i>Integrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Authentication -->
+<section class="py-5 bg-light" id="authentication">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <h2 class="text-center mb-4">Autenticação</h2>
+                
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <p class="lead">
+                            Todas as requisições devem incluir sua API key para autenticação.
+                        </p>
+                        
+                        <h5>Métodos de Autenticação</h5>
+                        
+                        <div class="row g-4 mt-3">
+                            <div class="col-md-6">
+                                <h6>Header Authorization (Recomendado)</h6>
+                                <div class="bg-dark text-light p-3 rounded">
+                                    <code>Authorization: Bearer SEU_API_KEY</code>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Query Parameter</h6>
+                                <div class="bg-dark text-light p-3 rounded">
+                                    <code>?token=SEU_API_KEY</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-warning mt-4">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Importante:</strong> Nunca exponha sua API key no frontend. 
+                            Faça as requisições sempre do seu backend.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- API Modules -->
+<section class="py-5" id="endpoints">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12 text-center mb-5">
+                <h2 class="h1 mb-3">Módulos da API</h2>
+                <p class="lead text-muted">
+                    68 endpoints organizados em 7 módulos especializados
+                </p>
+            </div>
+        </div>
+        
+        <!-- Modules Grid -->
+        <div class="row g-4">
+            <!-- Companies Module -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-building me-2"></i>
+                            Empresas & Companhias
+                            <span class="badge bg-light text-primary ms-2">38 endpoints</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            Dados completos de empresas listadas na B3, demonstrações financeiras, 
+                            indicadores calculados e documentos CVM.
+                        </p>
+                        
+                        <h6>Principais Endpoints:</h6>
+                        <ul class="list-unstyled">
+                            <li><code class="text-primary">GET /companies</code> - Lista de empresas</li>
+                            <li><code class="text-primary">GET /companies/{id}/raw-reports</code> - Relatórios CVM</li>
+                            <li><code class="text-primary">GET /companies/{id}/financial-ratios</code> - Indicadores</li>
+                            <li><code class="text-primary">GET /companies/{id}/dividends</code> - Dividendos</li>
+                        </ul>
+                        
+                        <button class="btn btn-outline-primary" onclick="showModule('companies')">
+                            <i class="fas fa-eye me-1"></i>Ver Detalhes
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Market Module -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-candlestick me-2"></i>
+                            Mercado & Cotações
+                            <span class="badge bg-light text-success ms-2">6 endpoints</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            Cotações em tempo real, dados históricos OHLCV, índices de mercado 
+                            e fluxo de investidores estrangeiros.
+                        </p>
+                        
+                        <h6>Principais Endpoints:</h6>
+                        <ul class="list-unstyled">
+                            <li><code class="text-success">GET /quotes</code> - Cotações tempo real</li>
+                            <li><code class="text-success">GET /quotes/{ticker}/history</code> - Histórico</li>
+                            <li><code class="text-success">GET /indices</code> - Índices de mercado</li>
+                            <li><code class="text-success">GET /foreign-investors</code> - Fluxo estrangeiro</li>
+                        </ul>
+                        
+                        <button class="btn btn-outline-success" onclick="showModule('market')">
+                            <i class="fas fa-eye me-1"></i>Ver Detalhes
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Macro Module -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-globe me-2"></i>
+                            Dados Macroeconômicos
+                            <span class="badge bg-light text-info ms-2">6 endpoints</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            SELIC, IPCA, IGP-M, PIB, câmbio, expectativas de mercado, 
+                            Boletim Focus e curvas de juros do BCB.
+                        </p>
+                        
+                        <h6>Principais Endpoints:</h6>
+                        <ul class="list-unstyled">
+                            <li><code class="text-info">GET /macroeconomics/indicators</code> - Indicadores</li>
+                            <li><code class="text-info">GET /macroeconomics/focus-report</code> - Boletim Focus</li>
+                            <li><code class="text-info">GET /macroeconomics/yield-curves</code> - Curvas</li>
+                            <li><code class="text-info">GET /macroeconomics/commodities</code> - Commodities</li>
+                        </ul>
+                        
+                        <button class="btn btn-outline-info" onclick="showModule('macro')">
+                            <i class="fas fa-eye me-1"></i>Ver Detalhes
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- News Module -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-newspaper me-2"></i>
+                            Notícias & Análises
+                            <span class="badge bg-dark text-warning ms-2">4 endpoints</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            Feed de notícias com análise de sentimento, relatórios de research 
+                            e recomendações de analistas.
+                        </p>
+                        
+                        <h6>Principais Endpoints:</h6>
+                        <ul class="list-unstyled">
+                            <li><code class="text-warning">GET /news</code> - Feed de notícias</li>
+                            <li><code class="text-warning">GET /news/{id}</code> - Detalhes da notícia</li>
+                            <li><code class="text-warning">GET /research/reports</code> - Relatórios</li>
+                            <li><code class="text-warning">GET /research/analyst-reports</code> - Analistas</li>
+                        </ul>
+                        
+                        <button class="btn btn-outline-warning" onclick="showModule('news')">
+                            <i class="fas fa-eye me-1"></i>Ver Detalhes
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Technical Analysis Module -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>
+                            Análise Técnica
+                            <span class="badge bg-light text-danger ms-2">3 endpoints</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            Indicadores técnicos (SMA, EMA, RSI, MACD), níveis de suporte/resistência 
+                            e detecção de padrões gráficos.
+                        </p>
+                        
+                        <h6>Principais Endpoints:</h6>
+                        <ul class="list-unstyled">
+                            <li><code class="text-danger">GET /technical-analysis/{ticker}/indicators</code></li>
+                            <li><code class="text-danger">GET /technical-analysis/{ticker}/support-resistance</code></li>
+                            <li><code class="text-danger">GET /technical-analysis/{ticker}/patterns</code></li>
+                        </ul>
+                        
+                        <button class="btn btn-outline-danger" onclick="showModule('technical')">
+                            <i class="fas fa-eye me-1"></i>Ver Detalhes
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Streaming Module -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-purple text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-broadcast-tower me-2"></i>
+                            Streaming Real-time
+                            <span class="badge bg-light text-dark ms-2">3 endpoints</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            WebSocket para cotações em tempo real, book de ofertas 
+                            e stream de negócios realizados.
+                        </p>
+                        
+                        <h6>Principais Endpoints:</h6>
+                        <ul class="list-unstyled">
+                            <li><code class="text-purple">WS /stream/quotes</code> - Cotações real-time</li>
+                            <li><code class="text-purple">WS /stream/orderbook</code> - Book de ofertas</li>
+                            <li><code class="text-purple">WS /stream/trades</code> - Negócios</li>
+                        </ul>
+                        
+                        <button class="btn btn-outline-purple" onclick="showModule('streaming')">
+                            <i class="fas fa-eye me-1"></i>Ver Detalhes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Code Examples -->
+<section class="py-5 bg-light" id="examples">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12 text-center mb-5">
+                <h2 class="h1 mb-3">Exemplos de Código</h2>
+                <p class="lead text-muted">
+                    Veja como integrar nossa API em diferentes linguagens
+                </p>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-lg-12">
+                <!-- Language Tabs -->
+                <ul class="nav nav-tabs justify-content-center mb-4" id="codeExampleTabs">
+                    <li class="nav-item">
+                        <button class="nav-link active" id="curl-tab" data-bs-toggle="tab" data-bs-target="#curl">
+                            <i class="fas fa-terminal me-1"></i>cURL
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="python-tab" data-bs-toggle="tab" data-bs-target="#python">
+                            <i class="fab fa-python me-1"></i>Python
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="javascript-tab" data-bs-toggle="tab" data-bs-target="#javascript">
+                            <i class="fab fa-js-square me-1"></i>JavaScript
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="php-tab" data-bs-toggle="tab" data-bs-target="#php">
+                            <i class="fab fa-php me-1"></i>PHP
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content" id="codeExampleContent">
+                    <!-- cURL Example -->
+                    <div class="tab-pane fade show active" id="curl">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                <span>Exemplo cURL - Buscar cotações</span>
+                                <button class="btn btn-sm btn-outline-light" onclick="copyCode('curl-code')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <pre class="mb-0"><code id="curl-code" class="language-bash">curl -X GET "https://api.mercadobrasil.com.br/v1/quotes?tickers=PETR4,VALE3" \
+  -H "Authorization: Bearer SEU_API_KEY" \
+  -H "Content-Type: application/json"
+
+# Resposta
+{
+  "data": {
+    "quotes": [
+      {
+        "ticker": "PETR4",
+        "price": 38.50,
+        "change": 0.87,
+        "change_percent": 2.31,
+        "volume": 45230000,
+        "timestamp": "2024-01-15T18:00:00Z"
+      }
+    ]
+  },
+  "status": "success"
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Python Example -->
+                    <div class="tab-pane fade" id="python">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                <span>Exemplo Python - Cliente da API</span>
+                                <button class="btn btn-sm btn-outline-light" onclick="copyCode('python-code')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <pre class="mb-0"><code id="python-code" class="language-python">import requests
+import json
+
+class MercadoBrasilAPI:
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.base_url = "https://api.mercadobrasil.com.br/v1"
+        self.headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+    
+    def get_quotes(self, tickers):
+        """Buscar cotações de múltiplos tickers"""
+        tickers_str = ",".join(tickers)
+        url = f"{self.base_url}/quotes"
+        params = {"tickers": tickers_str}
+        
+        response = requests.get(url, headers=self.headers, params=params)
+        response.raise_for_status()
+        return response.json()
+    
+    def get_company_ratios(self, cvm_code):
+        """Buscar indicadores financeiros de uma empresa"""
+        url = f"{self.base_url}/companies/{cvm_code}/financial-ratios"
+        
+        response = requests.get(url, headers=self.headers)
+        response.raise_for_status()
+        return response.json()
+
+# Exemplo de uso
+api = MercadoBrasilAPI("SEU_API_KEY")
+
+# Buscar cotações
+quotes = api.get_quotes(["PETR4", "VALE3", "ITUB4"])
+print(json.dumps(quotes, indent=2))
+
+# Buscar indicadores da Petrobras (CVM: 5410)
+ratios = api.get_company_ratios(5410)
+print(f"ROE: {ratios['data']['profitability_ratios']['roe']}")
+</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- JavaScript Example -->
+                    <div class="tab-pane fade" id="javascript">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                <span>Exemplo JavaScript - Integração Frontend</span>
+                                <button class="btn btn-sm btn-outline-light" onclick="copyCode('js-code')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <pre class="mb-0"><code id="js-code" class="language-javascript">class MercadoBrasilAPI {
+    constructor(apiKey) {
+        this.apiKey = apiKey;
+        this.baseUrl = 'https://api.mercadobrasil.com.br/v1';
+    }
+
+    async request(endpoint, params = {}) {
+        const url = new URL(`${this.baseUrl}${endpoint}`);
+        Object.keys(params).forEach(key => 
+            url.searchParams.append(key, params[key])
+        );
+
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${this.apiKey}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
+
+        return await response.json();
+    }
+
+    async getQuotes(tickers) {
+        return this.request('/quotes', { 
+            tickers: tickers.join(',') 
+        });
+    }
+
+    async getNews(category = null, limit = 10) {
+        const params = { limit };
+        if (category) params.category = category;
+        return this.request('/news', params);
+    }
+
+    async getMacroIndicators() {
+        return this.request('/macroeconomics/indicators');
+    }
+}
+
+// Exemplo de uso
+const api = new MercadoBrasilAPI('SEU_API_KEY');
+
+// Buscar cotações e atualizar interface
+async function updateQuotes() {
+    try {
+        const data = await api.getQuotes(['PETR4', 'VALE3']);
+        
+        data.data.quotes.forEach(quote => {
+            document.getElementById(`price-${quote.ticker}`)
+                .textContent = `R$ ${quote.price.toFixed(2)}`;
+            
+            const changeElement = document.getElementById(`change-${quote.ticker}`);
+            changeElement.textContent = `${quote.change_percent.toFixed(2)}%`;
+            changeElement.className = quote.change >= 0 ? 'text-success' : 'text-danger';
+        });
+    } catch (error) {
+        console.error('Erro ao buscar cotações:', error);
+    }
+}
+
+// Atualizar a cada 30 segundos
+setInterval(updateQuotes, 30000);
+updateQuotes(); // Primeira chamada
+</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PHP Example -->
+                    <div class="tab-pane fade" id="php">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                <span>Exemplo PHP - Backend Integration</span>
+                                <button class="btn btn-sm btn-outline-light" onclick="copyCode('php-code')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <pre class="mb-0"><code id="php-code" class="language-php"><?php
+
+class MercadoBrasilAPI {
+    private $apiKey;
+    private $baseUrl = 'https://api.mercadobrasil.com.br/v1';
+    
+    public function __construct($apiKey) {
+        $this->apiKey = $apiKey;
+    }
+    
+    private function request($endpoint, $params = []) {
+        $url = $this->baseUrl . $endpoint;
+        
+        if (!empty($params)) {
+            $url .= '?' . http_build_query($params);
+        }
+        
+        $headers = [
+            'Authorization: Bearer ' . $this->apiKey,
+            'Content-Type: application/json'
+        ];
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($httpCode !== 200) {
+            throw new Exception("API Error: HTTP $httpCode");
+        }
+        
+        return json_decode($response, true);
+    }
+    
+    public function getQuotes($tickers) {
+        return $this->request('/quotes', [
+            'tickers' => implode(',', $tickers)
+        ]);
+    }
+    
+    public function getCompanyData($cvmCode) {
+        return $this->request("/companies/$cvmCode");
+    }
+    
+    public function getFinancialRatios($cvmCode) {
+        return $this->request("/companies/$cvmCode/financial-ratios");
+    }
+}
+
+// Exemplo de uso
+try {
+    $api = new MercadoBrasilAPI('SEU_API_KEY');
+    
+    // Buscar cotações
+    $quotes = $api->getQuotes(['PETR4', 'VALE3', 'ITUB4']);
+    
+    echo "<h2>Cotações Atuais</h2>";
+    foreach ($quotes['data']['quotes'] as $quote) {
+        $changeClass = $quote['change'] >= 0 ? 'success' : 'danger';
+        echo "<div class='alert alert-$changeClass'>";
+        echo "<strong>{$quote['ticker']}</strong>: ";
+        echo "R$ " . number_format($quote['price'], 2, ',', '.');
+        echo " ({$quote['change_percent']}%)";
+        echo "</div>";
+    }
+    
+    // Buscar dados da Petrobras
+    $petrobras = $api->getCompanyData(5410);
+    echo "<h3>Dados da Petrobras</h3>";
+    echo "<p>Razão Social: {$petrobras['data']['company_name']}</p>";
+    echo "<p>Setor: {$petrobras['data']['b3_sector']}</p>";
+    
+} catch (Exception $e) {
+    echo "Erro: " . $e->getMessage();
+}
+
+?>
+</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Rate Limits -->
+<section class="py-5" id="rate-limits">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <h2 class="text-center mb-4">Rate Limits e Planos</h2>
+                
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm text-center">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Básico</h5>
+                                <div class="text-muted">Gratuito</div>
+                            </div>
+                            <div class="card-body">
+                                <div class="display-6 text-primary mb-2">1K</div>
+                                <p class="text-muted">requisições/hora</p>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check text-success me-2"></i>Todos os endpoints</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Dados históricos</li>
+                                    <li><i class="fas fa-times text-muted me-2"></i>WebSocket</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm text-center border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">Profissional</h5>
+                                <div>R$ 99/mês</div>
+                            </div>
+                            <div class="card-body">
+                                <div class="display-6 text-primary mb-2">10K</div>
+                                <p class="text-muted">requisições/hora</p>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check text-success me-2"></i>Todos os endpoints</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Dados históricos</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>WebSocket</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Suporte prioritário</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm text-center">
+                            <div class="card-header bg-warning">
+                                <h5 class="mb-0">Enterprise</h5>
+                                <div>Sob consulta</div>
+                            </div>
+                            <div class="card-body">
+                                <div class="display-6 text-primary mb-2">100K+</div>
+                                <p class="text-muted">requisições/hora</p>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check text-success me-2"></i>Tudo do Profissional</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>SLA 99.9%</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Suporte dedicado</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Customizações</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- API Status -->
+<section class="py-5 bg-light" id="status">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <h2 class="text-center mb-4">Status da API</h2>
+                
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="row text-center g-4">
+                            <div class="col-md-3">
+                                <div class="text-success mb-2">
+                                    <i class="fas fa-circle"></i>
+                                </div>
+                                <h6>Status Geral</h6>
+                                <div class="fw-bold text-success">Operacional</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-success mb-2">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <h6>Uptime</h6>
+                                <div class="fw-bold">99.97%</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-info mb-2">
+                                    <i class="fas fa-tachometer-alt"></i>
+                                </div>
+                                <h6>Latência Média</h6>
+                                <div class="fw-bold">245ms</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-primary mb-2">
+                                    <i class="fas fa-database"></i>
+                                </div>
+                                <h6>Última Atualização</h6>
+                                <div class="fw-bold" id="last-update">--</div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="text-center">
+                            <a href="/health" class="btn btn-outline-primary me-2">
+                                <i class="fas fa-heartbeat me-1"></i>Health Check
+                            </a>
+                            <a href="/api/v1/status" class="btn btn-outline-info">
+                                <i class="fas fa-info-circle me-1"></i>Status Detalhado
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Module Details Modal -->
+<div class="modal fade" id="moduleModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-list me-2"></i>
+                    <span id="modal-module-title">Detalhes do Módulo</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-module-content">
+                    <!-- Module details will be populated here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" onclick="testEndpoint()">
+                    <i class="fas fa-play me-1"></i>Testar Endpoint
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initializeApiDocs();
+    updateLastUpdate();
+});
+
+function initializeApiDocs() {
+    console.log('API Documentation initialized');
+    
+    // Setup scroll spy for navigation
+    if (typeof bootstrap !== 'undefined' && bootstrap.ScrollSpy) {
+        new bootstrap.ScrollSpy(document.body, {
+            target: '#navbar'
+        });
+    }
+}
+
+function updateLastUpdate() {
+    document.getElementById('last-update').textContent = 
+        new Date().toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+}
+
+function copyCode(elementId) {
+    const codeElement = document.getElementById(elementId);
+    const code = codeElement.textContent;
+    
+    navigator.clipboard.writeText(code).then(() => {
+        // Show success feedback
+        const btn = event.target.closest('button');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+        btn.classList.add('btn-success');
+        btn.classList.remove('btn-outline-light');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-light');
+        }, 2000);
+    }).catch(err => {
+        console.error('Erro ao copiar código:', err);
+        alert('Erro ao copiar código. Tente selecioná-lo manualmente.');
+    });
+}
+
+function generateApiKey() {
+    // Simulate API key generation
+    const apiKey = 'mb_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    
+    const result = prompt('Sua nova API Key (clique OK para copiar):', apiKey);
+    if (result) {
+        navigator.clipboard.writeText(apiKey).then(() => {
+            alert('API Key copiada para a área de transferência!');
+        });
+    }
+}
+
+function showExample() {
+    // Scroll to examples section
+    document.getElementById('examples').scrollIntoView({ 
+        behavior: 'smooth' 
+    });
+}
+
+function showIntegration() {
+    // Show integration examples
+    alert('Exemplos de integração disponíveis na seção de código acima!');
+}
+
+function showModule(moduleType) {
+    const moduleData = getModuleData(moduleType);
+    
+    document.getElementById('modal-module-title').textContent = moduleData.title;
+    document.getElementById('modal-module-content').innerHTML = moduleData.content;
+    
+    const modal = new bootstrap.Modal(document.getElementById('moduleModal'));
+    modal.show();
+}
+
+function getModuleData(moduleType) {
+    const modules = {
+        companies: {
+            title: 'Empresas & Companhias - 38 Endpoints',
+            content: `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Endpoints Principais</h6>
+                        <div class="list-group">
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <code>GET /companies</code>
+                                    <span class="badge bg-success">Público</span>
+                                </div>
+                                <small class="text-muted">Lista paginada de empresas com filtros</small>
+                            </div>
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <code>GET /companies/{cvm_code}</code>
+                                    <span class="badge bg-success">Público</span>
+                                </div>
+                                <small class="text-muted">Detalhes completos da empresa</small>
+                            </div>
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <code>GET /companies/{cvm_code}/raw-reports</code>
+                                    <span class="badge bg-warning">Premium</span>
+                                </div>
+                                <small class="text-muted">Relatórios CVM brutos (DFP, ITR, etc.)</small>
+                            </div>
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <code>GET /companies/{cvm_code}/financial-ratios</code>
+                                    <span class="badge bg-warning">Premium</span>
+                                </div>
+                                <small class="text-muted">Indicadores financeiros calculados</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Exemplo de Resposta</h6>
+                        <pre class="bg-light p-3 rounded"><code>{
+  "data": {
+    "cvm_code": 5410,
+    "company_name": "Petróleo Brasileiro S.A.",
+    "trade_name": "PETROBRAS",
+    "cnpj": "33.000.167/0001-01",
+    "b3_sector": "Petróleo, Gás e Biocombustíveis",
+    "tickers": ["PETR3", "PETR4"],
+    "market_cap": 389450000000
+  }
+}</code></pre>
+                        
+                        <h6 class="mt-4">Parâmetros Comuns</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>sector:</strong> Filtrar por setor</li>
+                            <li><strong>segment:</strong> Filtrar por segmento B3</li>
+                            <li><strong>is_b3_listed:</strong> Apenas listadas</li>
+                            <li><strong>page:</strong> Página (padrão: 1)</li>
+                            <li><strong>limit:</strong> Itens por página (max: 200)</li>
+                        </ul>
+                    </div>
+                </div>
+            `
+        },
+        market: {
+            title: 'Mercado & Cotações - 6 Endpoints',
+            content: `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Endpoints de Mercado</h6>
+                        <div class="list-group">
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <code>GET /quotes</code>
+                                    <span class="badge bg-success">Público</span>
+                                </div>
+                                <small class="text-muted">Cotações em tempo real</small>
+                            </div>
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <code>GET /quotes/{ticker}/history</code>
+                                    <span class="badge bg-success">Público</span>
+                                </div>
+                                <small class="text-muted">Dados históricos OHLCV</small>
+                            </div>
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <code>GET /indices</code>
+                                    <span class="badge bg-success">Público</span>
+                                </div>
+                                <small class="text-muted">Índices de mercado (IBOV, IBRX, etc.)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Exemplo de Cotação</h6>
+                        <pre class="bg-light p-3 rounded"><code>{
+  "data": {
+    "quotes": [{
+      "ticker": "PETR4",
+      "price": 38.50,
+      "change": 0.87,
+      "change_percent": 2.31,
+      "volume": 45230000,
+      "high": 39.00,
+      "low": 38.20,
+      "timestamp": "2024-01-15T18:00:00Z"
+    }]
+  }
+}</code></pre>
+                        
+                        <h6 class="mt-4">Parâmetros de Histórico</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>period:</strong> 1d, 5d, 1m, 3m, 6m, 1y, 2y, 5y, max</li>
+                            <li><strong>interval:</strong> 1m, 5m, 15m, 30m, 1h, 1d, 1wk, 1mo</li>
+                            <li><strong>adjusted:</strong> Preços ajustados (true/false)</li>
+                        </ul>
+                    </div>
+                </div>
+            `
+        }
+        // Add other modules as needed
+    };
+    
+    return modules[moduleType] || { title: 'Módulo', content: 'Detalhes do módulo em desenvolvimento.' };
+}
+
+function testEndpoint() {
+    alert('Funcionalidade de teste de endpoint em desenvolvimento');
+}
+
+// Check API status periodically
+function checkApiStatus() {
+    fetch('/health')
+        .then(response => response.json())
+        .then(data => {
+            const statusElement = document.querySelector('#status .text-success');
+            if (data.status === 'healthy') {
+                statusElement.textContent = 'Operacional';
+                statusElement.className = 'fw-bold text-success';
+            } else {
+                statusElement.textContent = 'Degradado';
+                statusElement.className = 'fw-bold text-warning';
+            }
+        })
+        .catch(error => {
+            console.error('Error checking API status:', error);
+            const statusElement = document.querySelector('#status .text-success');
+            statusElement.textContent = 'Offline';
+            statusElement.className = 'fw-bold text-danger';
+        });
+}
+
+// Check status every 5 minutes
+setInterval(checkApiStatus, 300000);
+checkApiStatus(); // Initial check
+</script>
+{% endblock %}

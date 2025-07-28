@@ -1,0 +1,808 @@
+{% extends "base.html" %}
+
+{% block title %}Notícias e Análises - API Mercado Brasil{% endblock %}
+
+{% block content %}
+<!-- News Header -->
+<section class="py-4 bg-light">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="h3 mb-2">
+                    <i class="fas fa-newspaper me-2 text-primary"></i>
+                    Notícias e Análises
+                </h1>
+                <p class="text-muted mb-0">
+                    Feed em tempo real com análise de sentimento, relatórios de research e recomendações
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="fas fa-rss me-1"></i>RSS Feeds
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="subscribeFeed('all')">Todas as Notícias</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="subscribeFeed('market')">Mercado</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="subscribeFeed('companies')">Empresas</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="subscribeFeed('economy')">Economia</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Filters and Search -->
+<section class="py-3 border-bottom">
+    <div class="container">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" class="form-control" id="news-search" 
+                           placeholder="Buscar por palavra-chave ou ticker..." />
+                </div>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="category-filter">
+                    <option value="">Todas as Categorias</option>
+                    <option value="market">Mercado</option>
+                    <option value="companies">Empresas</option>
+                    <option value="economy">Economia</option>
+                    <option value="politics">Política</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="sentiment-filter">
+                    <option value="">Todos os Sentimentos</option>
+                    <option value="positive">Positivo</option>
+                    <option value="negative">Negativo</option>
+                    <option value="neutral">Neutro</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="date-filter">
+                    <option value="">Todas as Datas</option>
+                    <option value="today">Hoje</option>
+                    <option value="week">Esta Semana</option>
+                    <option value="month">Este Mês</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" onclick="searchNews()">
+                    <i class="fas fa-search me-1"></i>Buscar
+                </button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-4">
+    <div class="container">
+        <div class="row g-4">
+            <!-- News Feed -->
+            <div class="col-lg-8">
+                <!-- Breaking News -->
+                <div class="card border-0 shadow-sm mb-4" id="breaking-news" style="display: none;">
+                    <div class="card-header bg-danger text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Notícias de Última Hora
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="breaking-news-content">
+                            <!-- Breaking news will be populated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- News List -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>
+                            Feed de Notícias
+                        </h5>
+                        <div class="d-flex align-items-center">
+                            <span class="text-muted me-3" id="news-count">Carregando...</span>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary active" data-view="list">
+                                    <i class="fas fa-list"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" data-view="grid">
+                                    <i class="fas fa-th"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <!-- Loading State -->
+                        <div id="news-loading" class="text-center py-5">
+                            <div class="spinner-border text-primary mb-3"></div>
+                            <p class="text-muted">Carregando notícias...</p>
+                        </div>
+
+                        <!-- News List View -->
+                        <div id="news-list" style="display: none;">
+                            <!-- News items will be populated here -->
+                        </div>
+
+                        <!-- News Grid View -->
+                        <div id="news-grid" class="row g-3 p-3" style="display: none;">
+                            <!-- News cards will be populated here -->
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white border-0">
+                        <nav>
+                            <ul class="pagination justify-content-center mb-0" id="news-pagination">
+                                <!-- Pagination will be populated here -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Trending Topics -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0">
+                        <h6 class="mb-0">
+                            <i class="fas fa-fire text-danger me-2"></i>
+                            Tópicos em Alta
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="trending-topics">
+                            <!-- Trending topics will be populated here -->
+                            <div class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm text-primary"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sentiment Analysis -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0">
+                        <h6 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>
+                            Análise de Sentimento
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="sentiment-chart" height="200"></canvas>
+                        <div class="row text-center mt-3">
+                            <div class="col-4">
+                                <div class="text-success">
+                                    <i class="fas fa-thumbs-up mb-1"></i>
+                                    <div class="fw-bold" id="positive-count">0</div>
+                                    <small>Positivas</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="text-muted">
+                                    <i class="fas fa-minus mb-1"></i>
+                                    <div class="fw-bold" id="neutral-count">0</div>
+                                    <small>Neutras</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="text-danger">
+                                    <i class="fas fa-thumbs-down mb-1"></i>
+                                    <div class="fw-bold" id="negative-count">0</div>
+                                    <small>Negativas</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Research Reports -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0">
+                        <h6 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>
+                            Relatórios de Research
+                        </h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="research-reports">
+                            <!-- Research reports will be populated here -->
+                            <div class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm text-primary"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analyst Recommendations -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0">
+                        <h6 class="mb-0">
+                            <i class="fas fa-user-tie me-2"></i>
+                            Recomendações de Analistas
+                        </h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="analyst-recommendations">
+                            <!-- Analyst recommendations will be populated here -->
+                            <div class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm text-primary"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- News Detail Modal -->
+<div class="modal fade" id="newsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-newspaper me-2"></i>
+                    <span id="modal-news-title">Detalhes da Notícia</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div id="modal-news-content">
+                            <!-- News content will be populated here -->
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border-start ps-3">
+                            <h6>Informações</h6>
+                            <div id="modal-news-info">
+                                <!-- News info will be populated here -->
+                            </div>
+                            
+                            <h6 class="mt-4">Análise de Sentimento</h6>
+                            <div id="modal-sentiment-analysis">
+                                <!-- Sentiment analysis will be populated here -->
+                            </div>
+                            
+                            <h6 class="mt-4">Tickers Relacionados</h6>
+                            <div id="modal-related-tickers">
+                                <!-- Related tickers will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-outline-primary" onclick="shareNews()">
+                    <i class="fas fa-share me-1"></i>Compartilhar
+                </button>
+                <button type="button" class="btn btn-primary" onclick="openOriginalNews()">
+                    <i class="fas fa-external-link-alt me-1"></i>Ver Original
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentPage = 1;
+let currentFilters = {};
+let selectedNews = null;
+let sentimentChart = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeNewsPage();
+    loadNews();
+    loadTrendingTopics();
+    loadResearchReports();
+    loadAnalystRecommendations();
+    
+    // Setup search with debounce
+    setupNewsSearch();
+    
+    // Setup view toggle
+    setupViewControls();
+    
+    // Setup filter handlers
+    setupFilterHandlers();
+});
+
+function initializeNewsPage() {
+    console.log('News page initialized');
+}
+
+function setupNewsSearch() {
+    let searchTimeout;
+    document.getElementById('news-search').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            searchNews();
+        }, 500);
+    });
+}
+
+function setupViewControls() {
+    document.querySelectorAll('[data-view]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('[data-view]').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            toggleNewsView(this.dataset.view);
+        });
+    });
+}
+
+function setupFilterHandlers() {
+    document.getElementById('category-filter').addEventListener('change', searchNews);
+    document.getElementById('sentiment-filter').addEventListener('change', searchNews);
+    document.getElementById('date-filter').addEventListener('change', searchNews);
+}
+
+function loadNews(page = 1) {
+    currentPage = page;
+    
+    // Show loading state
+    document.getElementById('news-loading').style.display = 'block';
+    document.getElementById('news-list').style.display = 'none';
+    document.getElementById('news-grid').style.display = 'none';
+    
+    // Build query parameters
+    const params = new URLSearchParams({
+        page: page,
+        limit: 10
+    });
+    
+    // Add filters
+    Object.keys(currentFilters).forEach(key => {
+        if (currentFilters[key]) {
+            params.append(key, currentFilters[key]);
+        }
+    });
+    
+    fetch(`/api/v1/news?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.data && data.data.news) {
+                populateNews(data.data.news);
+                updateNewsPagination(data.pagination);
+                updateNewsCount(data.pagination.total_items);
+                updateSentimentChart(data.data.news);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading news:', error);
+            showNewsError();
+        })
+        .finally(() => {
+            document.getElementById('news-loading').style.display = 'none';
+        });
+}
+
+function searchNews() {
+    currentFilters = {
+        category: document.getElementById('category-filter').value,
+        sentiment: document.getElementById('sentiment-filter').value,
+        date_from: getDateFromFilter()
+    };
+    
+    const searchTerm = document.getElementById('news-search').value;
+    if (searchTerm) {
+        currentFilters.search = searchTerm;
+    }
+    
+    loadNews(1);
+}
+
+function getDateFromFilter() {
+    const dateFilter = document.getElementById('date-filter').value;
+    const today = new Date();
+    
+    switch(dateFilter) {
+        case 'today':
+            return today.toISOString().split('T')[0];
+        case 'week':
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            return weekAgo.toISOString().split('T')[0];
+        case 'month':
+            const monthAgo = new Date(today);
+            monthAgo.setMonth(monthAgo.getMonth() - 1);
+            return monthAgo.toISOString().split('T')[0];
+        default:
+            return null;
+    }
+}
+
+function populateNews(newsItems) {
+    const listContainer = document.getElementById('news-list');
+    const gridContainer = document.getElementById('news-grid');
+    
+    listContainer.innerHTML = '';
+    gridContainer.innerHTML = '';
+    
+    newsItems.forEach(news => {
+        // List item
+        const listItem = createNewsListItem(news);
+        listContainer.appendChild(listItem);
+        
+        // Grid item
+        const gridItem = createNewsGridItem(news);
+        gridContainer.appendChild(gridItem);
+    });
+    
+    // Show appropriate view
+    const activeView = document.querySelector('[data-view].active').dataset.view;
+    toggleNewsView(activeView);
+}
+
+function createNewsListItem(news) {
+    const div = document.createElement('div');
+    div.className = 'border-bottom p-3 news-item';
+    div.style.cursor = 'pointer';
+    div.onclick = () => viewNewsDetails(news);
+    
+    const publishedDate = new Date(news.published_at);
+    const sentimentIcon = getSentimentIcon(news.sentiment);
+    const sentimentClass = getSentimentClass(news.sentiment);
+    
+    div.innerHTML = `
+        <div class="row">
+            <div class="col-md-9">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="badge bg-primary me-2">${news.category}</span>
+                    <i class="${sentimentIcon} ${sentimentClass} me-2"></i>
+                    <small class="text-muted">${news.author || 'Autor não informado'}</small>
+                    <small class="text-muted ms-2">${publishedDate.toLocaleString('pt-BR')}</small>
+                </div>
+                <h6 class="mb-2">${news.title}</h6>
+                <p class="text-muted mb-2">${news.summary || ''}</p>
+                <div class="d-flex flex-wrap gap-1">
+                    ${(news.tags || []).map(tag => 
+                        `<span class="badge bg-light text-dark">${tag}</span>`
+                    ).join('')}
+                </div>
+            </div>
+            <div class="col-md-3 text-end">
+                <div class="mb-2">
+                    <span class="badge bg-info">Impacto: ${news.impact_score || 'N/A'}</span>
+                </div>
+                <div>
+                    ${(news.related_tickers || []).slice(0, 3).map(ticker => 
+                        `<span class="badge bg-secondary me-1">${ticker}</span>`
+                    ).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return div;
+}
+
+function createNewsGridItem(news) {
+    const div = document.createElement('div');
+    div.className = 'col-md-6';
+    
+    const publishedDate = new Date(news.published_at);
+    const sentimentIcon = getSentimentIcon(news.sentiment);
+    const sentimentClass = getSentimentClass(news.sentiment);
+    
+    div.innerHTML = `
+        <div class="card h-100 news-card" style="cursor: pointer;" onclick="viewNewsDetails(${JSON.stringify(news).replace(/"/g, '&quot;')})">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="badge bg-primary">${news.category}</span>
+                    <i class="${sentimentIcon} ${sentimentClass}"></i>
+                </div>
+                <h6 class="card-title">${news.title}</h6>
+                <p class="card-text text-muted small">${news.summary?.substring(0, 100) || ''}...</p>
+                <div class="d-flex justify-content-between align-items-center mt-auto">
+                    <small class="text-muted">${publishedDate.toLocaleDateString('pt-BR')}</small>
+                    <div>
+                        ${(news.related_tickers || []).slice(0, 2).map(ticker => 
+                            `<span class="badge bg-secondary me-1">${ticker}</span>`
+                        ).join('')}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return div;
+}
+
+function getSentimentIcon(sentiment) {
+    switch(sentiment) {
+        case 'positive': return 'fas fa-thumbs-up';
+        case 'negative': return 'fas fa-thumbs-down';
+        default: return 'fas fa-minus';
+    }
+}
+
+function getSentimentClass(sentiment) {
+    switch(sentiment) {
+        case 'positive': return 'text-success';
+        case 'negative': return 'text-danger';
+        default: return 'text-muted';
+    }
+}
+
+function toggleNewsView(viewType) {
+    if (viewType === 'list') {
+        document.getElementById('news-list').style.display = 'block';
+        document.getElementById('news-grid').style.display = 'none';
+    } else {
+        document.getElementById('news-list').style.display = 'none';
+        document.getElementById('news-grid').style.display = 'block';
+    }
+}
+
+function updateSentimentChart(newsItems) {
+    const sentimentCounts = {
+        positive: newsItems.filter(n => n.sentiment === 'positive').length,
+        neutral: newsItems.filter(n => n.sentiment === 'neutral').length,
+        negative: newsItems.filter(n => n.sentiment === 'negative').length
+    };
+    
+    // Update counters
+    document.getElementById('positive-count').textContent = sentimentCounts.positive;
+    document.getElementById('neutral-count').textContent = sentimentCounts.neutral;
+    document.getElementById('negative-count').textContent = sentimentCounts.negative;
+    
+    // Create/update chart
+    const ctx = document.getElementById('sentiment-chart').getContext('2d');
+    
+    if (sentimentChart) {
+        sentimentChart.destroy();
+    }
+    
+    sentimentChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Positivas', 'Neutras', 'Negativas'],
+            datasets: [{
+                data: [sentimentCounts.positive, sentimentCounts.neutral, sentimentCounts.negative],
+                backgroundColor: ['#198754', '#6c757d', '#dc3545'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+function loadTrendingTopics() {
+    // This would come from a real API endpoint analyzing trending terms
+    const topics = [
+        { term: 'PETR4', count: 45, change: '+12%' },
+        { term: 'SELIC', count: 38, change: '+8%' },
+        { term: 'Dividendos', count: 31, change: '+15%' },
+        { term: 'Inflação', count: 28, change: '-5%' },
+        { term: 'Câmbio', count: 24, change: '+3%' }
+    ];
+    
+    const container = document.getElementById('trending-topics');
+    container.innerHTML = topics.map(topic => `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+                <strong>${topic.term}</strong>
+                <small class="text-muted d-block">${topic.count} menções</small>
+            </div>
+            <span class="badge ${topic.change.includes('+') ? 'bg-success' : 'bg-danger'}">
+                ${topic.change}
+            </span>
+        </div>
+    `).join('');
+}
+
+function loadResearchReports() {
+    fetch('/api/v1/research/reports?limit=5')
+        .then(response => response.json())
+        .then(data => {
+            if (data.data && data.data.reports) {
+                updateResearchReports(data.data.reports);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading research reports:', error);
+            document.getElementById('research-reports').innerHTML = 
+                '<div class="text-center text-danger p-3">Erro ao carregar relatórios</div>';
+        });
+}
+
+function updateResearchReports(reports) {
+    const container = document.getElementById('research-reports');
+    
+    container.innerHTML = reports.map(report => `
+        <div class="border-bottom p-3">
+            <h6 class="mb-1">${report.title}</h6>
+            <p class="text-muted small mb-2">${report.summary}</p>
+            <div class="d-flex justify-content-between align-items-center">
+                <small class="text-muted">${report.author}</small>
+                <span class="badge ${getRatingClass(report.rating)}">${report.rating}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function loadAnalystRecommendations() {
+    fetch('/api/v1/research/analyst-reports?limit=5')
+        .then(response => response.json())
+        .then(data => {
+            if (data.data && data.data.analyst_reports) {
+                updateAnalystRecommendations(data.data.analyst_reports);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading analyst reports:', error);
+            document.getElementById('analyst-recommendations').innerHTML = 
+                '<div class="text-center text-danger p-3">Erro ao carregar recomendações</div>';
+        });
+}
+
+function updateAnalystRecommendations(recommendations) {
+    const container = document.getElementById('analyst-recommendations');
+    
+    container.innerHTML = recommendations.map(rec => `
+        <div class="border-bottom p-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <strong>${rec.ticker}</strong>
+                <span class="badge ${getRatingClass(rec.rating)}">${rec.rating}</span>
+            </div>
+            <p class="text-muted small mb-2">${rec.summary}</p>
+            <div class="d-flex justify-content-between align-items-center">
+                <small class="text-muted">${rec.analyst} - ${rec.brokerage}</small>
+                <small class="text-muted">Alvo: R$ ${rec.target_price}</small>
+            </div>
+        </div>
+    `).join('');
+}
+
+function getRatingClass(rating) {
+    switch(rating?.toUpperCase()) {
+        case 'BUY': case 'COMPRA': case 'POSITIVO': return 'bg-success';
+        case 'SELL': case 'VENDA': case 'NEGATIVO': return 'bg-danger';
+        case 'HOLD': case 'MANTER': case 'NEUTRO': return 'bg-warning';
+        default: return 'bg-secondary';
+    }
+}
+
+function viewNewsDetails(news) {
+    selectedNews = news;
+    
+    document.getElementById('modal-news-title').textContent = news.title;
+    
+    // Populate content
+    document.getElementById('modal-news-content').innerHTML = `
+        <div class="mb-3">
+            <div class="d-flex align-items-center mb-2">
+                <span class="badge bg-primary me-2">${news.category}</span>
+                <small class="text-muted">${news.author || 'Autor não informado'}</small>
+            </div>
+            <h4>${news.title}</h4>
+        </div>
+        <div class="mb-3">
+            <h6>Resumo</h6>
+            <p class="text-muted">${news.summary || 'Resumo não disponível'}</p>
+        </div>
+        <div>
+            <h6>Conteúdo</h6>
+            <div class="news-content">
+                ${news.content || 'Conteúdo completo disponível no link original'}
+            </div>
+        </div>
+    `;
+    
+    // Populate info
+    const publishedDate = new Date(news.published_at);
+    document.getElementById('modal-news-info').innerHTML = `
+        <table class="table table-sm">
+            <tr><td>Autor:</td><td>${news.author || 'N/A'}</td></tr>
+            <tr><td>Publicado:</td><td>${publishedDate.toLocaleString('pt-BR')}</td></tr>
+            <tr><td>Categoria:</td><td>${news.category}</td></tr>
+            <tr><td>Impact Score:</td><td>${news.impact_score || 'N/A'}</td></tr>
+        </table>
+    `;
+    
+    // Populate sentiment
+    const sentimentIcon = getSentimentIcon(news.sentiment);
+    const sentimentClass = getSentimentClass(news.sentiment);
+    document.getElementById('modal-sentiment-analysis').innerHTML = `
+        <div class="text-center">
+            <i class="${sentimentIcon} ${sentimentClass} fa-2x mb-2"></i>
+            <div class="fw-bold">${news.sentiment?.toUpperCase() || 'N/A'}</div>
+            <small class="text-muted">Score: ${news.sentiment_score || 'N/A'}</small>
+        </div>
+    `;
+    
+    // Populate related tickers
+    document.getElementById('modal-related-tickers').innerHTML = 
+        (news.related_tickers || []).map(ticker => 
+            `<span class="badge bg-primary me-1 mb-1">${ticker}</span>`
+        ).join('') || '<span class="text-muted">Nenhum ticker relacionado</span>';
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('newsModal'));
+    modal.show();
+}
+
+function updateNewsPagination(pagination) {
+    const paginationEl = document.getElementById('news-pagination');
+    paginationEl.innerHTML = '';
+    
+    if (pagination.total_pages <= 1) return;
+    
+    // Previous button
+    if (pagination.has_prev) {
+        const prevLi = document.createElement('li');
+        prevLi.className = 'page-item';
+        prevLi.innerHTML = `<a class="page-link" href="#" onclick="loadNews(${pagination.current_page - 1})">Anterior</a>`;
+        paginationEl.appendChild(prevLi);
+    }
+    
+    // Page numbers
+    const startPage = Math.max(1, pagination.current_page - 2);
+    const endPage = Math.min(pagination.total_pages, pagination.current_page + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === pagination.current_page ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#" onclick="loadNews(${i})">${i}</a>`;
+        paginationEl.appendChild(li);
+    }
+    
+    // Next button
+    if (pagination.has_next) {
+        const nextLi = document.createElement('li');
+        nextLi.className = 'page-item';
+        nextLi.innerHTML = `<a class="page-link" href="#" onclick="loadNews(${pagination.current_page + 1})">Próximo</a>`;
+        paginationEl.appendChild(nextLi);
+    }
+}
+
+function updateNewsCount(total) {
+    document.getElementById('news-count').textContent = `${total} notícias encontradas`;
+}
+
+function showNewsError() {
+    document.getElementById('news-list').innerHTML = 
+        '<div class="text-center text-danger py-4">Erro ao carregar notícias. Tente novamente.</div>';
+    document.getElementById('news-list').style.display = 'block';
+}
+
+function subscribeFeed(type) {
+    alert(`Inscrição no feed ${type} em desenvolvimento`);
+}
+
+function shareNews() {
+    if (selectedNews && selectedNews.url) {
+        navigator.clipboard.writeText(selectedNews.url).then(() => {
+            alert('Link copiado para a área de transferência!');
+        });
+    }
+}
+
+function openOriginalNews() {
+    if (selectedNews && selectedNews.url) {
+        window.open(selectedNews.url, '_blank');
+    }
+}
+</script>
+{% endblock %}

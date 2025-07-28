@@ -1,0 +1,489 @@
+API Completa - Mercado Financeiro Brasileiro
+📋 Visão Geral
+Esta API fornece acesso abrangente a todos os dados do mercado financeiro brasileiro, integrando informações da B3, CVM, RAD CVM, Banco Central e portais de notícias.
+Base URL: https://api.mercadobrasil.com.br/v1
+
+🏢 EMPRESAS & COMPANHIAS
+1. Lista de Empresas
+GET /companies
+Parâmetros:
+
+sector (string): Filtrar por setor
+segment (string): Filtrar por segmento de listagem
+is_b3_listed (boolean): Apenas empresas listadas na B3
+page (int): Página (default: 1)
+limit (int): Limite por página (default: 50, max: 200)
+
+Resposta:
+json{
+  "companies": [
+    {
+      "cvm_code": 5410,
+      "company_name": "Petróleo Brasileiro S.A.",
+      "trade_name": "PETROBRAS",
+      "cnpj": "33.000.167/0001-01",
+      "founded_date": "1953-10-03",
+      "main_activity": "Extração de petróleo e gás natural",
+      "website": "https://ri.petrobras.com.br",
+      "controlling_interest": "Estatal",
+      "is_state_owned": true,
+      "is_foreign": false,
+      "is_b3_listed": true,
+      "b3_issuer_code": "PETR",
+      "b3_listing_segment": "Novo Mercado",
+      "b3_sector": "Petróleo, Gás e Biocombustíveis",
+      "b3_subsector": "Exploração e Refino",
+      "b3_segment": "Petróleo",
+      "tickers": ["PETR3", "PETR4"],
+      "market_cap": 389450000000,
+      "employee_count": 45532,
+      "about": "Companhia integrada de energia..."
+    }
+  ],
+  "pagination": {
+    "current_page": 1,
+    "total_pages": 25,
+    "total_items": 1234,
+    "per_page": 50
+  }
+}
+2. Detalhes da Empresa
+GET /companies/{cvm_code}
+3. Relatórios Brutos (DFP/ITR)
+GET /companies/{cvm_code}/raw-reports
+Parâmetros:
+
+report_type (string): BPA, BPP, DRE, DFC_MI, DVA, DRA
+aggregation (string): INDIVIDUAL, CONSOLIDATED
+reference_date (date): Data de referência
+flat (boolean): Formato plano ou hierárquico
+
+4. Balanços Patrimoniais
+GET /companies/{cvm_code}/balance-sheets
+Parâmetros:
+
+statement_type (string): consolidated, individual
+reference_date (date): Data de referência
+period (string): quarterly, annual
+years (int): Número de anos históricos
+
+5. Demonstrações de Resultados
+GET /companies/{cvm_code}/income-statements
+6. Fluxos de Caixa
+GET /companies/{cvm_code}/cash-flows
+7. Indicadores Financeiros Calculados
+GET /companies/{cvm_code}/financial-ratios
+Resposta inclui:
+json{
+  "liquidity_ratios": {
+    "current_ratio": 2.15,
+    "quick_ratio": 1.87,
+    "cash_ratio": 0.54
+  },
+  "profitability_ratios": {
+    "gross_margin": 0.45,
+    "operating_margin": 0.32,
+    "net_margin": 0.28,
+    "roe": 0.18,
+    "roa": 0.12,
+    "roic": 0.15
+  },
+  "leverage_ratios": {
+    "debt_to_equity": 0.65,
+    "debt_to_assets": 0.38,
+    "interest_coverage": 8.5
+  },
+  "efficiency_ratios": {
+    "asset_turnover": 0.85,
+    "inventory_turnover": 12.3,
+    "receivables_turnover": 6.7
+  }
+}
+8. Indicadores de Mercado (Valuation)
+GET /companies/{cvm_code}/market-ratios
+Resposta:
+json{
+  "valuation_ratios": {
+    "pe_ratio": 12.5,
+    "pb_ratio": 1.8,
+    "ev_ebitda": 8.9,
+    "peg_ratio": 1.2,
+    "price_to_sales": 2.1,
+    "price_to_book": 1.8,
+    "price_to_cash_flow": 9.8
+  },
+  "per_share_data": {
+    "earnings_per_share": 8.45,
+    "book_value_per_share": 47.32,
+    "dividend_per_share": 2.15,
+    "cash_flow_per_share": 12.67
+  },
+  "market_data": {
+    "market_cap": 389450000000,
+    "enterprise_value": 445230000000,
+    "shares_outstanding": 13007000000,
+    "float_shares": 7804200000
+  }
+}
+9. Transações de Insiders
+GET /companies/{cvm_code}/insider-transactions
+10. Histórico de Ações
+GET /companies/{cvm_code}/shares-history
+11. Dividendos e Bonificações
+GET /companies/{cvm_code}/dividends
+Resposta:
+json{
+  "dividends": [
+    {
+      "type": "dividend",
+      "ex_date": "2023-08-15",
+      "payment_date": "2023-09-01",
+      "amount_per_share": 1.25,
+      "currency": "BRL",
+      "ticker": "PETR4",
+      "total_amount": 16258750000,
+      "yield_percentage": 3.2
+    }
+  ]
+}
+12. Bonificações e Desdobramentos
+GET /companies/{cvm_code}/stock-splits
+13. Documentos CVM
+GET /companies/{cvm_code}/documents
+Parâmetros:
+
+document_type (string): DFP, ITR, FR, IPO, RI
+date_from (date): Data inicial
+date_to (date): Data final
+
+14. Dados Bancários (para bancos)
+GET /companies/{cvm_code}/banking-data
+
+📈 MERCADO & COTAÇÕES
+15. Lista de Ativos
+GET /assets
+Parâmetros:
+
+asset_type (string): stock, reit, etf, bond, derivative
+sector (string): Setor
+index (string): Índice (IBOV, IBRX, SMLL)
+
+16. Cotações em Tempo Real
+GET /quotes
+Parâmetros:
+
+tickers (string): Lista de tickers separados por vírgula
+fields (string): Campos específicos
+
+Resposta:
+json{
+  "quotes": [
+    {
+      "ticker": "PETR4",
+      "price": 28.45,
+      "change": 0.87,
+      "change_percent": 3.15,
+      "volume": 45230000,
+      "volume_financial": 1287000000,
+      "open": 27.58,
+      "high": 28.67,
+      "low": 27.45,
+      "previous_close": 27.58,
+      "bid": 28.43,
+      "ask": 28.47,
+      "bid_size": 1000,
+      "ask_size": 500,
+      "timestamp": "2023-12-15T18:00:00Z",
+      "market_status": "closed"
+    }
+  ]
+}
+17. Histórico de Preços
+GET /quotes/{ticker}/history
+Parâmetros:
+
+period (string): 1d, 5d, 1m, 3m, 6m, 1y, 2y, 5y, max
+interval (string): 1m, 5m, 15m, 30m, 1h, 1d, 1wk, 1mo
+adjusted (boolean): Preços ajustados por proventos
+
+18. Índices de Mercado
+GET /indices
+Resposta:
+json{
+  "indices": [
+    {
+      "index_code": "IBOV",
+      "name": "Índice Bovespa",
+      "value": 126543.78,
+      "change": 1245.67,
+      "change_percent": 0.99,
+      "volume": 12450000000,
+      "timestamp": "2023-12-15T18:00:00Z",
+      "components_count": 85
+    }
+  ]
+}
+19. Composição de Índices
+GET /indices/{index_code}/composition
+20. Investidores Estrangeiros
+GET /foreign-investors
+Resposta:
+json{
+  "data": [
+    {
+      "date": "2023-12-15",
+      "net_flow": 1250000000,
+      "inflow": 8750000000,
+      "outflow": 7500000000,
+      "participation_percentage": 47.8
+    }
+  ]
+}
+
+🏦 DADOS MACROECONÔMICOS
+21. Indicadores Econômicos
+GET /macroeconomics/indicators
+Parâmetros:
+
+indicator (string): selic, ipca, igpm, pib, cambio
+date_from (date): Data inicial
+date_to (date): Data final
+
+Resposta:
+json{
+  "indicators": [
+    {
+      "indicator_code": "SELIC",
+      "name": "Taxa Selic",
+      "value": 11.75,
+      "unit": "percent_annual",
+      "date": "2023-12-15",
+      "previous_value": 12.25,
+      "change": -0.50,
+      "source": "BCB"
+    }
+  ]
+}
+22. Expectativas de Mercado
+GET /macroeconomics/expectations
+23. Boletim Focus
+GET /macroeconomics/focus-report
+24. Curvas de Juros
+GET /macroeconomics/yield-curves
+Resposta:
+json{
+  "curves": [
+    {
+      "curve_type": "di_futures",
+      "date": "2023-12-15",
+      "points": [
+        {
+          "maturity": "2024-01-02",
+          "days_to_maturity": 18,
+          "rate": 11.85,
+          "contract": "F24"
+        }
+      ]
+    }
+  ]
+}
+25. Câmbio
+GET /macroeconomics/exchange-rates
+26. Commodities
+GET /macroeconomics/commodities
+
+📰 NOTÍCIAS & ANÁLISES
+27. Últimas Notícias
+GET /news
+Parâmetros:
+
+category (string): market, companies, economy, politics
+ticker (string): Filtrar por ativo específico
+date_from (date): Data inicial
+sentiment (string): positive, negative, neutral
+
+Resposta:
+json{
+  "news": [
+    {
+      "id": "news_123456",
+      "title": "Petrobras anuncia novo plano estratégico",
+      "summary": "Companhia divulga investimentos de R$ 102 bi...",
+      "content": "A Petrobras anunciou hoje...",
+      "author": "Reuters Brasil",
+      "published_at": "2023-12-15T14:30:00Z",
+      "url": "https://source.com/news/123456",
+      "category": "companies",
+      "tags": ["PETR4", "petróleo", "investimentos"],
+      "sentiment": "positive",
+      "sentiment_score": 0.7,
+      "impact_score": 8.5,
+      "related_tickers": ["PETR3", "PETR4"]
+    }
+  ]
+}
+28. Detalhes da Notícia
+GET /news/{news_id}
+29. Análises de Mercado
+GET /research/reports
+30. Relatórios de Analistas
+GET /research/analyst-reports
+
+🔍 DADOS COMPLEMENTARES
+31. Calendário de Eventos
+GET /calendar/events
+Resposta:
+json{
+  "events": [
+    {
+      "date": "2023-12-20",
+      "time": "16:00",
+      "event_type": "earnings",
+      "company": "VALE3",
+      "description": "Divulgação de resultados 3T23",
+      "importance": "high"
+    }
+  ]
+}
+32. IPOs e Ofertas
+GET /calendar/offerings
+33. Dividendos (Calendário)
+GET /calendar/dividends
+34. Setores da Economia
+GET /sectors
+35. Subsídios Governamentais
+GET /government/subsidies
+36. Leilões e Privatizações
+GET /government/auctions
+37. Regulamentações CVM
+GET /regulations/cvm
+38. Comunicados Banco Central
+GET /regulations/bacen
+
+🔄 WEBSOCKETS & STREAMING
+39. Cotações em Tempo Real
+WS /stream/quotes
+Subscrição:
+json{
+  "action": "subscribe",
+  "tickers": ["PETR4", "VALE3", "ITUB4"]
+}
+40. Book de Ofertas
+WS /stream/orderbook
+41. Negócios Realizados
+WS /stream/trades
+
+📊 ANÁLISE TÉCNICA
+42. Indicadores Técnicos
+GET /technical-analysis/{ticker}/indicators
+Parâmetros:
+
+indicators (string): sma, ema, rsi, macd, bollinger
+period (int): Período para cálculo
+
+Resposta:
+json{
+  "indicators": {
+    "sma_20": 28.35,
+    "sma_50": 29.12,
+    "sma_200": 31.45,
+    "rsi": 65.4,
+    "macd": {
+      "macd_line": 0.45,
+      "signal_line": 0.38,
+      "histogram": 0.07
+    },
+    "bollinger_bands": {
+      "upper": 30.25,
+      "middle": 28.35,
+      "lower": 26.45
+    }
+  }
+}
+43. Suporte e Resistência
+GET /technical-analysis/{ticker}/support-resistance
+44. Padrões Gráficos
+GET /technical-analysis/{ticker}/patterns
+
+🔐 AUTENTICAÇÃO & LIMITES
+Headers Obrigatórios
+Authorization: Bearer {api_key}
+Content-Type: application/json
+X-API-Version: v1
+Rate Limits
+
+Plano Básico: 1,000 requests/hora
+Plano Profissional: 10,000 requests/hora
+Plano Enterprise: 100,000 requests/hora
+WebSocket: 50 conexões simultâneas
+
+Códigos de Status
+
+200 - Sucesso
+400 - Requisição inválida
+401 - Não autorizado
+403 - Limite excedido
+404 - Recurso não encontrado
+429 - Rate limit excedido
+500 - Erro interno do servidor
+
+
+📱 SDKs Disponíveis
+
+Python: pip install mercadobrasil-api
+JavaScript/Node.js: npm install mercadobrasil-api
+Java: Maven/Gradle dependency
+C#/.NET: NuGet package
+R: CRAN package
+Excel Add-in
+
+
+🎯 Casos de Uso por Área
+Frontend - Abas do Sistema
+
+Dashboard Principal
+
+/quotes (cotações principais)
+/indices (índices)
+/macroeconomics/indicators (indicadores macro)
+/news (últimas notícias)
+
+
+Aba Empresas
+
+/companies (listagem)
+/companies/{id} (detalhes)
+/companies/{id}/financial-ratios (indicadores)
+
+
+Aba Mercado
+
+/assets (lista de ativos)
+/quotes (cotações)
+/indices (índices)
+
+
+Aba Análise
+
+/technical-analysis/{ticker}/indicators
+/companies/{id}/market-ratios
+/research/reports
+
+
+Aba Notícias
+
+/news
+/news/{id}
+/calendar/events
+
+
+Aba Macro
+
+/macroeconomics/indicators
+/macroeconomics/expectations
+/macroeconomics/yield-curves
+
+
+
+
+Esta API fornece cobertura completa do mercado financeiro brasileiro, integrando dados de múltiplas fontes oficiais (B3, CVM, BCB) com análises avançadas, notícias e ferramentas de análise técnica, permitindo a criação de plataformas financeiras robustas e completas.

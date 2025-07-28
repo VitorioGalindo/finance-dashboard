@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Financeiro - Dados CVM/RAD</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            margin: 20px;
+            padding: 30px;
+        }
+        
+        .header-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .company-selector {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 2px solid #e9ecef;
+        }
+        
+        .data-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007bff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .data-section h5 {
+            color: #007bff;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        
+        .data-point {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border-left: 3px solid #28a745;
+        }
+        
+        .no-data {
+            color: #6c757d;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 25px;
+            font-weight: 600;
+        }
+        
+        .company-info {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <!-- Header -->
+            <div class="header-section">
+                <h1><i class="fas fa-chart-line me-3"></i>Dashboard Financeiro Brasileiro</h1>
+                <p class="mb-0">Dados Completos CVM/RAD - Todas as Empresas B3</p>
+            </div>
+            
+            <!-- Company Selector -->
+            <div class="company-selector">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <label for="companySelect" class="form-label fw-bold">
+                            <i class="fas fa-building me-2"></i>Selecione uma Empresa:
+                        </label>
+                        <select class="form-select form-select-lg" id="companySelect" onchange="loadCompanyData()">
+                            <option value="">-- Escolha uma empresa --</option>
+                            {% for company in companies %}
+                            <option value="{{ company.ticker }}">{{ company.ticker }} - {{ company.company_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-primary btn-lg w-100 mt-4" onclick="loadCompanyData()">
+                            <i class="fas fa-search me-2"></i>Buscar Dados
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Company Info -->
+            <div id="companyInfo" class="company-info" style="display: none;">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h3 id="companyName" class="mb-2"></h3>
+                        <p class="mb-1"><strong>Ticker:</strong> <span id="companyTicker"></span></p>
+                        <p class="mb-1"><strong>Código CVM:</strong> <span id="companyCVM"></span></p>
+                        <p class="mb-0"><strong>CNPJ:</strong> <span id="companyCNPJ"></span></p>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-number" id="dataPointsCount">0</div>
+                                <div class="stat-label">Pontos de Dados</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" id="lastUpdateDate">-</div>
+                                <div class="stat-label">Última Atualização</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Loading -->
+            <div id="loading" class="loading" style="display: none;">
+                <i class="fas fa-spinner fa-spin fa-3x mb-3"></i>
+                <h4>Carregando dados financeiros...</h4>
+                <p>Buscando informações dos 13 pontos de dados CVM/RAD</p>
+            </div>
+            
+            <!-- Data Sections -->
+            <div id="dataContainer" style="display: none;">
+                <!-- 1. Demonstrações Financeiras -->
+                <div class="data-section">
+                    <h5><i class="fas fa-file-invoice-dollar me-2"></i>1. Demonstrações Financeiras (DFP/ITR)</h5>
+                    <div id="financialStatements" class="data-content"></div>
+                </div>
+                
+                <!-- 2. Transações de Insiders -->
+                <div class="data-section">
+                    <h5><i class="fas fa-exchange-alt me-2"></i>2. Transações de Insiders</h5>
+                    <div id="insiderTransactions" class="data-content"></div>
+                </div>
+                
+                <!-- 3. Dividendos -->
+                <div class="data-section">
+                    <h5><i class="fas fa-coins me-2"></i>3. Dividendos e Proventos</h5>
+                    <div id="dividends" class="data-content"></div>
+                </div>
+                
+                <!-- 4. Composição Acionária -->
+                <div class="data-section">
+                    <h5><i class="fas fa-pie-chart me-2"></i>4. Composição Acionária</h5>
+                    <div id="shareholding" class="data-content"></div>
+                </div>
+                
+                <!-- 5. Administradores -->
+                <div class="data-section">
+                    <h5><i class="fas fa-users me-2"></i>5. Administradores e Conselheiros</h5>
+                    <div id="administrators" class="data-content"></div>
+                </div>
+                
+                <!-- 6. Assembleias -->
+                <div class="data-section">
+                    <h5><i class="fas fa-gavel me-2"></i>6. Assembleias Gerais</h5>
+                    <div id="assemblies" class="data-content"></div>
+                </div>
+                
+                <!-- 7. Partes Relacionadas -->
+                <div class="data-section">
+                    <h5><i class="fas fa-sitemap me-2"></i>7. Partes Relacionadas</h5>
+                    <div id="relatedParties" class="data-content"></div>
+                </div>
+                
+                <!-- 8. Eventos Corporativos -->
+                <div class="data-section">
+                    <h5><i class="fas fa-calendar-alt me-2"></i>8. Eventos Corporativos</h5>
+                    <div id="corporateEvents" class="data-content"></div>
+                </div>
+                
+                <!-- 9. Captações -->
+                <div class="data-section">
+                    <h5><i class="fas fa-money-bill-wave me-2"></i>9. Captações de Recursos</h5>
+                    <div id="fundraising" class="data-content"></div>
+                </div>
+                
+                <!-- 10. Documentos Regulatórios -->
+                <div class="data-section">
+                    <h5><i class="fas fa-file-alt me-2"></i>10. Documentos Regulatórios</h5>
+                    <div id="regulatoryDocs" class="data-content"></div>
+                </div>
+                
+                <!-- 11. Dados de Mercado -->
+                <div class="data-section">
+                    <h5><i class="fas fa-chart-area me-2"></i>11. Dados de Mercado</h5>
+                    <div id="marketData" class="data-content"></div>
+                </div>
+                
+                <!-- 12. Indicadores Calculados -->
+                <div class="data-section">
+                    <h5><i class="fas fa-calculator me-2"></i>12. Indicadores Financeiros Calculados</h5>
+                    <div id="calculatedIndicators" class="data-content"></div>
+                </div>
+                
+                <!-- 13. Histórico de Coleta -->
+                <div class="data-section">
+                    <h5><i class="fas fa-history me-2"></i>13. Histórico de Coleta</h5>
+                    <div id="collectionHistory" class="data-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function loadCompanyData() {
+            const ticker = document.getElementById('companySelect').value;
+            if (!ticker) {
+                alert('Por favor, selecione uma empresa');
+                return;
+            }
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('companyInfo').style.display = 'none';
+            document.getElementById('dataContainer').style.display = 'none';
+            
+            try {
+                // Load company data
+                const response = await fetch(`/api/company/${ticker}/complete-data`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayCompanyInfo(data.company);
+                    displayAllData(data.data);
+                    
+                    // Show sections
+                    document.getElementById('companyInfo').style.display = 'block';
+                    document.getElementById('dataContainer').style.display = 'block';
+                } else {
+                    alert('Erro ao carregar dados: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao carregar dados da empresa');
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+        
+        function displayCompanyInfo(company) {
+            document.getElementById('companyName').textContent = company.company_name;
+            document.getElementById('companyTicker').textContent = company.ticker;
+            document.getElementById('companyCVM').textContent = company.cvm_code || 'N/A';
+            document.getElementById('companyCNPJ').textContent = company.cnpj || 'N/A';
+        }
+        
+        function displayAllData(allData) {
+            // 1. Demonstrações Financeiras
+            displayDataSection('financialStatements', allData.financial_statements, 
+                (item) => `
+                    <div class="data-point">
+                        <strong>Ano:</strong> ${item.year} | 
+                        <strong>Tipo:</strong> ${item.document_type} | 
+                        <strong>Receita:</strong> R$ ${formatNumber(item.net_revenue)} |
+                        <strong>Lucro:</strong> R$ ${formatNumber(item.net_income)}
+                    </div>
+                `
+            );
+            
+            // 2. Transações de Insiders
+            displayDataSection('insiderTransactions', allData.insider_transactions,
+                (item) => `
+                    <div class="data-point">
+                        <strong>Data:</strong> ${item.transaction_date} | 
+                        <strong>Pessoa:</strong> ${item.person_name} | 
+                        <strong>Tipo:</strong> ${item.transaction_type} |
+                        <strong>Quantidade:</strong> ${formatNumber(item.quantity)}
+                    </div>
+                `
+            );
+            
+            // 3. Dividendos
+            displayDataSection('dividends', allData.dividends,
+                (item) => `
+                    <div class="data-point">
+                        <strong>Data:</strong> ${item.ex_date} | 
+                        <strong>Tipo:</strong> ${item.dividend_type} | 
+                        <strong>Valor:</strong> R$ ${formatNumber(item.value_per_share)} |
+                        <strong>Status:</strong> ${item.status}
+                    </div>
+                `
+            );
+            
+            // 4. Composição Acionária
+            displayDataSection('shareholding', allData.shareholding_composition,
+                (item) => `
+                    <div class="data-point">
+                        <strong>Acionista:</strong> ${item.shareholder_name} | 
+                        <strong>Tipo:</strong> ${item.shareholder_type} | 
+                        <strong>Participação:</strong> ${item.ownership_percentage}% |
+                        <strong>Ações:</strong> ${formatNumber(item.shares_quantity)}
+                    </div>
+                `
+            );
+            
+            // 5. Administradores
+            displayDataSection('administrators', allData.administrators,
+                (item) => `
+                    <div class="data-point">
+                        <strong>Nome:</strong> ${item.name} | 
+                        <strong>Cargo:</strong> ${item.position} | 
+                        <strong>Início:</strong> ${item.start_date} |
+                        <strong>CPF:</strong> ${item.cpf || 'N/A'}
+                    </div>
+                `
+            );
+            
+            // 6. Assembleias
+            displayDataSection('assemblies', allData.general_meetings,
+                (item) => `
+                    <div class="data-point">
+                        <strong>Data:</strong> ${item.meeting_date} | 
+                        <strong>Tipo:</strong> ${item.meeting_type} | 
+                        <strong>Convocação:</strong> ${item.call_date} |
+                        <strong>Local:</strong> ${item.location}
+                    </div>
+                `
+            );
+            
+            // 7. Partes Relacionadas
+            displayDataSection('relatedParties', allData.related_parties,
+                (item) => `
+                    <div class="data-point">
+                        <strong>Nome:</strong> ${item.party_name} | 
+                        <strong>Tipo:</strong> ${item.party_type} | 
+                        <strong>Relação:</strong> ${item.relationship} |
+                        <strong>Valor:</strong> R$ ${formatNumber(item.transaction_amount)}
+                    </div>
+                `
+            );
+            
+            // 8. Eventos Corporativos
+            displayDataSection('corporateEvents', allData.corporate_events,
+                (item) => `
+                    <div class="data-point">
+                        <strong>Data:</strong> ${item.event_date} | 
+                        <strong>Tipo:</strong> ${item.event_type} | 
+                        <strong>Descrição:</strong> ${item.description} |
+                        <strong>Status:</strong> ${item.status}
+                    </div>
+                `
+            );
+            
+            // 9. Captações
+            displayDataSection('fundraising', allData.fundraising,
+                (item) => `
+                    <div class="data-point">
+                        <strong>Data:</strong> ${item.issuance_date} | 
+                        <strong>Tipo:</strong> ${item.security_type} | 
+                        <strong>Valor:</strong> R$ ${formatNumber(item.total_value)} |
+                        <strong>Quantidade:</strong> ${formatNumber(item.quantity)}
+                    </div>
+                `
+            );
+            
+            // 10. Documentos Regulatórios
+            displayDataSection('regulatoryDocs', allData.regulatory_documents,
+                (item) => `
+                    <div class="data-point">
+                        <strong>Data:</strong> ${item.submission_date} | 
+                        <strong>Tipo:</strong> ${item.document_type} | 
+                        <strong>Categoria:</strong> ${item.category} |
+                        <strong>Versão:</strong> ${item.version}
+                    </div>
+                `
+            );
+            
+            // 11. Dados de Mercado
+            displayDataSection('marketData', allData.market_data,
+                (item) => `
+                    <div class="data-point">
+                        <strong>Data:</strong> ${item.date} | 
+                        <strong>Preço:</strong> R$ ${item.close_price} | 
+                        <strong>Volume:</strong> ${formatNumber(item.volume)} |
+                        <strong>Var:</strong> ${item.change_percent}%
+                    </div>
+                `
+            );
+            
+            // 12. Indicadores Calculados
+            displayDataSection('calculatedIndicators', allData.calculated_indicators,
+                (item) => `
+                    <div class="data-point">
+                        <strong>Indicador:</strong> ${item.indicator_name} | 
+                        <strong>Valor:</strong> ${item.value} | 
+                        <strong>Período:</strong> ${item.period} |
+                        <strong>Data:</strong> ${item.calculation_date}
+                    </div>
+                `
+            );
+            
+            // Update stats
+            const totalDataPoints = Object.values(allData).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+            document.getElementById('dataPointsCount').textContent = totalDataPoints;
+            document.getElementById('lastUpdateDate').textContent = new Date().toLocaleDateString('pt-BR');
+        }
+        
+        function displayDataSection(elementId, data, formatFunction) {
+            const element = document.getElementById(elementId);
+            
+            if (!data || data.length === 0) {
+                element.innerHTML = '<div class="no-data">Nenhum dado encontrado para esta seção</div>';
+                return;
+            }
+            
+            const html = data.slice(0, 10).map(formatFunction).join('');
+            const moreCount = data.length > 10 ? data.length - 10 : 0;
+            const moreText = moreCount > 0 ? `<div class="text-muted mt-2"><small>... e mais ${moreCount} registros</small></div>` : '';
+            
+            element.innerHTML = html + moreText;
+        }
+        
+        function formatNumber(num) {
+            if (!num) return '0';
+            return new Intl.NumberFormat('pt-BR').format(num);
+        }
+    </script>
+</body>
+</html>
