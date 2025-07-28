@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Float, DateTime, Boolean, Text, JSON, ForeignKey
 )
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base, relationship
 
 # Cria uma Base da qual todos os modelos herdarão
 Base = declarative_base()
@@ -43,6 +43,9 @@ class Company(Base):
     last_itr_quarter = Column(String(10))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Adiciona o relacionamento para que possamos acessar os demonstrativos a partir de uma empresa
+    financial_statements = relationship("FinancialStatement", back_populates="company")
 
 class Quote(Base):
     __tablename__ = 'quotes'
@@ -91,7 +94,7 @@ class InsiderTransaction(Base):
     id = Column(Integer, primary_key=True)
     cvm_code = Column(Integer, nullable=False, index=True)
     company_name = Column(String(255))
-    document_type = Column(String(50))
+    document_.type = Column(String(50))
     delivery_date = Column(DateTime)
     reference_date = Column(DateTime)
     status = Column(String(50))
@@ -173,7 +176,11 @@ class ApiKey(Base):
 class FinancialStatement(Base):
     __tablename__ = 'financial_statements'
     id = Column(Integer, primary_key=True)
-    cvm_code = Column(Integer, nullable=False)
+    
+    # --- CHAVE ESTRANGEIRA ADICIONADA ---
+    company_id = Column(Integer, ForeignKey('companies.id'), nullable=False, index=True)
+    
+    cvm_code = Column(Integer, nullable=False, index=True)
     report_type = Column(String(20), nullable=False)
     aggregation = Column(String(20), nullable=False)
     reference_date = Column(DateTime, nullable=False)
@@ -184,6 +191,9 @@ class FinancialStatement(Base):
     data = Column(JSON)
     tree_data = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Adiciona o relacionamento reverso para acessar a empresa a partir do demonstrativo
+    company = relationship("Company", back_populates="financial_statements")
 
 class Ticker(Base):
     __tablename__ = 'tickers'
