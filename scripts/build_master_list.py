@@ -1,14 +1,14 @@
-# scripts/build_master_list.py (Versão Definitiva com Mapeamento e Verificação)
+# scripts/build_master_list.py (Versão Definitiva com Filtro por Tickers)
 import os
 import sys
 import pandas as pd
+import requests
+import zipfile
 import io
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
-import requests
-import zipfile
 
 # --- CONFIGURAÇÃO DE PATH ---
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -22,7 +22,6 @@ def get_db_connection_string():
     return f"postgresql+psycopg2://{user}:{pw}@{host}/{db}?sslmode=require"
 
 def get_reference_tickers():
-    # ... (Sua lista completa de tickers aqui) ...
     csv_data = """"Ticker","Nome"
 "BBAS3","Banco do Brasil"
 "AZUL4","Azul"
@@ -425,52 +424,111 @@ def get_reference_tickers():
     return set(df['Ticker'].str.upper())
 
 def get_cvm_data():
-    """Baixa e processa os arquivos de cadastro e valores mobiliários da CVM."""
     print("Baixando dados cadastrais da CVM (cad_cia_aberta.csv)...")
     try:
         url_cad = "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
         res_cad = requests.get(url_cad, timeout=60)
         res_cad.raise_for_status()
         df_cad = pd.read_csv(io.StringIO(res_cad.content.decode('latin-1')), sep=';', dtype=str)
-        df_cad.rename(columns={'CNPJ_CIA': 'cnpj'}, inplace=True)
-        df_cad['cnpj'] = df_cad['cnpj'].str.replace(r'\D', '', regex=True)
+        # Mapeamento de colunas do CAD
+        cad_column_map = {
+            'CNPJ_CIA': 'cnpj',
+            'CD_CVM': 'cvm_code',
+            'DENOM_SOCIAL': 'company_name',
+            'DENOM_COMERC': 'trade_name',
+            'SETOR_ATIV': 'b3_sector',
+            'ATIV_PRINC': 'main_activity',
+            'PAG_WEB': 'website',
+            'SIT': 'status'
+        }
+        df_cad.rename(columns=cad_column_map, inplace=True)
+        # Limpa o CNPJ após renomear
+        if 'cnpj' in df_cad.columns: df_cad['cnpj'] = df_cad['cnpj'].str.replace(r'D', '', regex=True)
+        
         print("Dados cadastrais baixados.")
 
         print("Baixando dados de valores mobiliários da CVM (FCA)...")
         year = datetime.now().year
-        # ... (lógica para baixar o arquivo FCA) ...
+        try:
+            url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
+            res_fca = requests.get(url_fca, timeout=120)
+            if res_fca.status_code != 200:
+                year -= 1
+                url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
+                res_fca = requests.get(url_fca, timeout=120)
+            res_fca.raise_for_status()
+        except requests.exceptions.RequestException as e: raise e
+
+        zip_buffer = io.BytesIO(res_fca.content)
+        with zipfile.ZipFile(zip_buffer) as z:
+            file_name = f"fca_cia_aberta_valor_mobiliario_{year}.csv"
+            with z.open(file_name) as f:
+                df_fca = pd.read_csv(f, sep=';', encoding='latin-1', dtype=str)
         
-        return df_cad, pd.DataFrame() # Retorna um DF vazio para FCA por enquanto
+        # Mapeamento de colunas do FCA - Inclui o nome correto do ticker
+        fca_column_map = {
+            'CNPJ_Companhia': 'cnpj',
+            'Codigo_Negociacao': 'ticker',
+        }
+        df_fca.rename(columns=fca_column_map, inplace=True)
+        # Limpa o CNPJ no FCA após renomear
+        if 'cnpj' in df_fca.columns: df_fca['cnpj'] = df_fca['cnpj'].str.replace(r'D', '', regex=True)
+
+        print(f"Dados de valores mobiliários ({year}) baixados.")
+        
+        return df_cad, df_fca
     except Exception as e:
         print(f"❌ ERRO CRÍTICO ao baixar dados da CVM: {e}")
         return pd.DataFrame(), pd.DataFrame()
 
 def run_etl():
-    """Orquestra o processo de ETL para criar a lista mestra de empresas."""
-    print("--- INICIANDO ETL DA LISTA MESTRA DE EMPRESAS (PROFISSIONAL) ---")
+    print("--- INICIANDO ETL DA LISTA MESTRA DE EMPRESAS (VERSÃO DEFINITIVA) ---")
     
     engine = create_engine(get_db_connection_string())
     Session = sessionmaker(bind=engine)
     session = Session()
 
     try:
-        # FASE 1: EXTRAÇÃO
         reference_tickers = get_reference_tickers()
-        df_cad, _ = get_cvm_data() # Ignoramos o FCA por enquanto
+        df_cad, df_fca = get_cvm_data()
 
-        if df_cad.empty: return
+        if df_cad.empty or df_fca.empty: return
 
-        # FASE 2: TRANSFORMAÇÃO (Filtro)
-        # Por enquanto, vamos carregar todas as empresas do cadastro CVM
-        # A filtragem por tickers de referência será um passo de aprimoramento.
-        df_final = df_cad.copy()
-        df_final.dropna(subset=['CD_CVM', 'cnpj'], inplace=True)
-        df_final.drop_duplicates(subset=['cnpj'], inplace=True)
+        print("Enriquecendo e filtrando dados com base nos tickers de referência...")
         
-        print(f"{len(df_final)} empresas únicas encontradas no cadastro da CVM.")
+        # Filtrar o FCA apenas para os tickers da nossa lista
+        df_fca_filtered = df_fca[df_fca['ticker'].str.upper().isin(reference_tickers)].copy()
+        
+        # Juntar os dados cadastrais com os tickers filtrados usando o CNPJ como chave
+        # Usamos um inner join para garantir que só peguemos empresas que TÊM um ticker na nossa lista E um cadastro na CVM
+        df_merged = pd.merge(
+            df_cad,
+            df_fca_filtered[['cnpj', 'ticker']],
+            on='cnpj',
+            how='inner'
+        )
+        
+        # Agrupa por empresa (CNPJ) para coletar todos os seus tickers e outras informações relevantes
+        print("Agrupando tickers por empresa (CNPJ)...")
+        agg_funcs = {
+            'ticker': (lambda x: sorted(list(x.unique()))), # Agrega todos os tickers para o mesmo CNPJ
+            'company_name': 'first', # Pega o primeiro nome encontrado (deve ser o mesmo para o mesmo CNPJ)
+            'cvm_code': 'first',
+            'trade_name': 'first',
+            'b3_sector': 'first',
+            'main_activity': 'first',
+            'website': 'first',
+            'status': 'first' # Mantém o status para verificar se é ativo
+        }
+        df_final_agg = df_merged.groupby('cnpj').agg(agg_funcs).reset_index()
 
-        # FASE 3: CARGA
-        print("Limpando a tabela 'companies'...")
+        # FILTRO FINAL: Apenas empresas com status 'ATIVO' e que tem tickers
+        df_final = df_final_agg[df_final_agg['status'] == 'ATIVO'].copy()
+        df_final.drop(columns=['status'], inplace=True) # Remove a coluna status depois de filtrar
+
+        print(f"{len(df_final)} empresas da lista de referência encontradas, ativas e enriquecidas.")
+
+        print("Limpando a tabela 'companies' (e tabelas dependentes)...")
         session.execute(text("TRUNCATE TABLE public.companies RESTART IDENTITY CASCADE;"))
         
         print(f"Populando a tabela 'companies' com {len(df_final)} registros...")
@@ -479,13 +537,14 @@ def run_etl():
         for _, row in df_final.iterrows():
             companies_to_load.append({
                 'cnpj': row['cnpj'],
-                'cvm_code': int(row['CD_CVM']),
-                'company_name': row['DENOM_SOCIAL'],
-                'trade_name': row.get('DENOM_COMERCIAL'),
-                'is_b3_listed': row.get('SIT') == 'ATIVO',
-                'b3_sector': row.get('SETOR_ATIV'),
-                'main_activity': row.get('ATIV_PRINC'),
-                'website': row.get('PAG_WEB')
+                'cvm_code': int(row['cvm_code']),
+                'company_name': row['company_name'],
+                'trade_name': row['trade_name'] if pd.notna(row['trade_name']) else row['company_name'],
+                'is_b3_listed': True,
+                'tickers': row['ticker'],
+                'b3_sector': row.get('b3_sector'),
+                'main_activity': row.get('main_activity'),
+                'website': row.get('website')
             })
         
         if companies_to_load:
