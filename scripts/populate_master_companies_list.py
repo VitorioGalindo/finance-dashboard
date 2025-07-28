@@ -1,4 +1,4 @@
-# scripts/populate_master_companies_list.py (Com a lista de referência completa)
+# scripts/populate_master_companies_list.py (Versão Final e Corrigida)
 import os
 import sys
 import re
@@ -36,7 +36,6 @@ def normalize_company_name(name):
 def get_reference_list():
     """Carrega a lista de tickers e nomes fornecida como um DataFrame."""
     print("Carregando a lista de referência de empresas...")
-    
     csv_data = """"Ticker","Nome"
 "BBAS3","Banco do Brasil"
 "AZUL4","Azul"
@@ -449,8 +448,6 @@ def get_cvm_master_data():
         response = requests.get(url, timeout=60)
         response.raise_for_status()
         cvm_data = pd.read_csv(io.StringIO(response.content.decode('latin-1')), sep=';', dtype=str)
-        # Renomeia a coluna normalizada para evitar conflito no merge
-        cvm_data.rename(columns={'normalized_name': 'normalized_name_cvm'}, inplace=True)
         cvm_data['normalized_name_cvm'] = cvm_data['DENOM_SOCIAL'].apply(normalize_company_name)
         print("Dados da CVM processados.")
         return cvm_data
@@ -481,7 +478,6 @@ def run_etl():
         
         df_enriched = df_merged.dropna(subset=['CNPJ_CIA', 'CD_CVM']).copy()
         
-        # --- CORREÇÃO: GARANTIR UNICIDADE POR CVM_CODE ---
         print("Agrupando tickers e garantindo unicidade por empresa...")
         
         df_enriched['CD_CVM'] = pd.to_numeric(df_enriched['CD_CVM'], errors='coerce')
@@ -493,8 +489,6 @@ def run_etl():
             'Nome': 'first',
             'DENOM_SOCIAL': 'first',
             'CNPJ_CIA': 'first',
-            'SEGMENTO': 'first',
-            'DENOM_COMERCIAL': 'first'
         }
         df_final_agg = df_final.groupby('CD_CVM').agg(agg_funcs).reset_index()
 
@@ -515,7 +509,6 @@ def run_etl():
                 'company_name': row['DENOM_SOCIAL'],
                 'trade_name': row['Nome'],
                 'cnpj': cnpj_cleaned,
-                'b3_listing_segment': row.get('SEGMENTO'),
                 'is_b3_listed': True,
                 'tickers': row['Ticker']
             })
