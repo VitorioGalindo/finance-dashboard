@@ -7,6 +7,7 @@ from io import BytesIO, StringIO
 import zipfile
 import time
 from typing import Dict, List, Optional
+import io
 
 from scraper.config import CVM_DADOS_ABERTOS_URL, REQUESTS_HEADERS, START_YEAR_HISTORICAL_LOAD
 from scraper.database import get_db_session
