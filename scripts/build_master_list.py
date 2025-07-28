@@ -1,19 +1,21 @@
-# scripts/build_master_list.py (Versão Autônoma e Definitiva)
+# scripts/build_master_list.py (Versão Final e Corrigida)
 import os
 import sys
 import pandas as pd
-import requests
-import zipfile
 import io
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
+import requests
+import zipfile
 
 # --- CONFIGURAÇÃO DE PATH ---
-# Adiciona a pasta 'scraper' ao path para que possamos importar seus modelos
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scraper')))
-from models import Base, Company # Importa a definição da tabela de destino
+
+# --- IMPORTAÇÕES ---
+from models import Base, Company
 
 def get_db_connection_string():
     """Lê as credenciais do .env na raiz do projeto."""
@@ -487,6 +489,7 @@ def run_etl():
 
         print("Enriquecendo dados com informações da CVM...")
         
+        # CORREÇÃO: Usa 'CODIGO_NEGOCIACAO' que é o nome correto da coluna de ticker no arquivo FCA
         df_fca_filtered = df_fca[df_fca['CODIGO_NEGOCIACAO'].str.upper().isin(reference_tickers)].copy()
         
         df_merged = pd.merge(df_cad, df_fca_filtered[['CNPJ_CIA', 'CODIGO_NEGOCIACAO']], on='CNPJ_CIA', how='inner')
