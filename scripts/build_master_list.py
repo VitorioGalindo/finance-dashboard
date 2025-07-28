@@ -1,4 +1,4 @@
-# scripts/build_master_list.py
+# scripts/build_master_list.py (CORRIGIDO)
 import os
 import sys
 import pandas as pd
@@ -7,20 +7,16 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 # --- CONFIGURAÇÃO DE PATH ---
-# Adiciona a raiz do projeto e a pasta 'scraper' ao path para permitir importações
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scraper')))
 
-# --- IMPORTAÇÕES DAS FERRAMENTAS EXISTENTES ---
-# Importa o modelo de dados que define a estrutura da nossa tabela de destino
+# --- IMPORTAÇÕES CORRIGIDAS ---
 from models import Base, Company
-# Importa a classe de scraper que sabe como buscar dados da CVM
-from services.scraper_cvm_advanced import AdvancedCVMScraper
+from services.scraper_cvm_advanced import CVMAdvancedScraper # NOME CORRIGIDO AQUI
 
 def get_db_connection_string():
     """Lê as credenciais do .env na raiz do projeto."""
     load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
-    # ... (código para construir a string de conexão)
     user = os.getenv("DB_USER")
     password = os.getenv("DB_PASSWORD")
     host = os.getenv("DB_HOST")
@@ -31,7 +27,6 @@ def get_db_connection_string():
 
 def get_reference_tickers():
     """Carrega apenas o conjunto de tickers da sua lista de referência."""
-    # ... (código para carregar sua lista)
     csv_data = """"Ticker","Nome"
 "BBAS3","Banco do Brasil"
 "AZUL4","Azul"
@@ -435,7 +430,7 @@ def get_reference_tickers():
 
 def run_etl():
     """Orquestra o processo de ETL para criar a lista mestra de empresas."""
-    print("--- INICIANDO ETL DA LISTA MESTRA DE EMPRESAS (VERSÃO PROFISSIONAL) ---")
+    print("--- INICIANDO ETL DA LISTA MESTRA DE EMPRESAS (PROFISSIONAL) ---")
     
     engine = create_engine(get_db_connection_string())
     Session = sessionmaker(bind=engine)
@@ -445,34 +440,26 @@ def run_etl():
         # FASE 1: EXTRAÇÃO
         reference_tickers = get_reference_tickers()
         
-        # Usa a classe de scraper do projeto 'scraper' que já sabe lidar com os detalhes
-        cvm_scraper = AdvancedCVMScraper()
+        print("Buscando dados da CVM usando o scraper avançado...")
+        cvm_scraper = CVMAdvancedScraper()
         df_cad = cvm_scraper.get_cad_cia_aberta()
         df_fca = cvm_scraper.get_fca_valor_mobiliario()
 
         if df_cad.empty or df_fca.empty:
-            print("Não foi possível obter os dados da CVM. Abortando.")
+            print("Não foi possível obter os dados da CVM com o scraper. Abortando.")
             return
 
         # FASE 2: TRANSFORMAÇÃO (ENRIQUECIMENTO)
         print("Enriquecendo dados com informações da CVM...")
         
-        # Filtra o FCA apenas para os tickers que nos interessam
         df_fca_filtered = df_fca[df_fca['ticker'].str.upper().isin(reference_tickers)].copy()
         
-        # Junta os dados cadastrais com os tickers filtrados usando o CNPJ como chave
-        df_merged = pd.merge(
-            df_cad,
-            df_fca_filtered[['cnpj', 'ticker']],
-            on='cnpj',
-            how='inner' # 'inner' garante que só teremos empresas que estão em ambos os arquivos
-        )
+        df_merged = pd.merge(df_cad, df_fca_filtered[['cnpj', 'ticker']], on='cnpj', how='inner')
         
-        # Agrupa por empresa para coletar todos os seus tickers
         print("Agrupando tickers por empresa...")
         agg_funcs = {
             'ticker': (lambda x: sorted(list(x.unique()))),
-            'company_name': 'first',
+            'company_name_cvm': 'first',
             'cvm_code': 'first',
             'sector': 'first',
             'main_activity': 'first',
@@ -493,8 +480,8 @@ def run_etl():
             companies_to_load.append({
                 'cnpj': row['cnpj'],
                 'cvm_code': int(row['cvm_code']),
-                'company_name': row['company_name'],
-                'trade_name': row['company_name'], # Usar o nome social como fallback
+                'company_name': row['company_name_cvm'],
+                'trade_name': row['company_name_cvm'],
                 'is_b3_listed': True,
                 'tickers': row['ticker'],
                 'b3_sector': row.get('sector'),
