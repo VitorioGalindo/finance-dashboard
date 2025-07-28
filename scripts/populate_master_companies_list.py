@@ -1,4 +1,4 @@
-# scripts/populate_master_companies_list.py
+# scripts/populate_master_companies_list.py (Com a lista de referência completa)
 import os
 import sys
 import re
@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 
 # Adiciona a pasta 'scraper' ao path para que possamos importar seus modelos
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scraper')))
-from models import Base, Company  # Importa a Base e o modelo Company
+from models import Base, Company
 
 def get_db_connection_string():
     """Lê as credenciais do .env na raiz do projeto."""
@@ -29,7 +29,6 @@ def normalize_company_name(name):
     """Limpa e padroniza o nome de uma empresa para facilitar a correspondência."""
     if not isinstance(name, str):
         return ""
-    # Remove S.A, S/A, HOLDING, PARTICIPACOES, etc. para um matching mais flexível
     name = re.sub(r'\s+S\.A\.|\s+S/A|\s+SA', '', name, flags=re.IGNORECASE)
     name = re.sub(r'\s+HOLDING|\s+PARTICIPACOES', '', name, flags=re.IGNORECASE)
     return name.strip().upper()
@@ -38,7 +37,6 @@ def get_reference_list():
     """Carrega a lista de tickers e nomes fornecida como um DataFrame."""
     print("Carregando a lista de referência de empresas...")
     
-    # Seus dados, formatados como uma string CSV
     csv_data = """"Ticker","Nome"
 "BBAS3","Banco do Brasil"
 "AZUL4","Azul"
@@ -64,6 +62,7 @@ def get_reference_list():
 "POMO4","Marcopolo"
 "IFCM3","Infracommerce"
 "CSNA3","Siderúrgica Nacional"
+"MOTV3","Motiva"
 "BEEF3","Minerva"
 "CPLE6","Copel"
 "CMIG4","Cemig"
@@ -71,9 +70,9 @@ def get_reference_list():
 "PCAR3","Grupo Pão de Açúcar"
 "MRVE3","MRV"
 "EMBR3","Embraer"
-"RRRP3","3R Petroleum"
+"BRAV3","3R Petroleum"
 "BPAC11","Banco BTG Pactual"
-"PRIO3","Prio"
+"PRIO3","PetroRio"
 "PETR3","Petrobras"
 "DXCO3","Dexco"
 "YDUQ3","YDUQS"
@@ -85,6 +84,7 @@ def get_reference_list():
 "BHIA3","Casas Bahia"
 "BBDC3","Banco Bradesco"
 "EQTL3","Equatorial Energia"
+"RCSL4","Recrusul"
 "CSMG3","COPASA"
 "RAIL3","Rumo"
 "VIVT3","Vivo"
@@ -118,14 +118,18 @@ def get_reference_list():
 "SANB11","Banco Santander"
 "RENT3","Localiza"
 "BRFS3","BRF"
+"CPLE3","Copel"
+"ALOS3","Allos"
 "SBSP3","Sabesp"
 "JHSF3","JHSF"
 "VIVA3","Vivara"
+"AZTE3","AZT Energia"
 "CAML3","Camil Alimentos"
 "ARML3","Armac"
 "RECV3","PetroRecôncavo"
 "MYPK3","Iochpe-Maxion"
 "SMTO3","São Martinho"
+"IGTI11","Jereissati Participações"
 "IGTI11","Iguatemi"
 "CURY3","Cury"
 "AMER3","Americanas"
@@ -138,7 +142,9 @@ def get_reference_list():
 "BMGB4","Banco BMG"
 "HBSA3","Hidrovias do Brasil"
 "TTEN3","3tentos"
+"MLAS3","Multilaser"
 "SRNA3","Serena Energia"
+"KLBN4","Klabin"
 "BPAN4","Banco Pan"
 "GRND3","Grendene"
 "ENGI11","Energisa"
@@ -148,26 +154,34 @@ def get_reference_list():
 "AZEV4","Azevedo & Travassos"
 "LJQQ3","Lojas Quero-Quero"
 "ALPA4","Alpargatas"
+"ISAE4","ISA Energia"
 "INTB3","Intelbras"
 "SAPR11","Sanepar"
+"ELET6","Eletrobras"
 "STBP3","Santos Brasil"
 "TAEE11","Taesa"
 "EZTC3","EZTEC"
 "DIRR3","Direcional"
+"SAPR4","Sanepar"
 "KEPL3","Kepler Weber"
 "MILS3","Mills"
 "PSSA3","Porto Seguro"
 "POSI3","Positivo"
 "ONCO3","Oncoclínicas"
+"CPFE3","CPFL Energia"
 "SBFG3","Grupo SBF"
 "OPCT3","OceanPact"
+"AZZA3","Arezzo"
 "TUPY3","Tupy"
 "GUAR3","Guararapes"
 "FRAS3","Fras-le"
 "NEOE3","Neoenergia"
 "JALL3","Jalles Machado"
+"HBRE3","HBR Realty"
 "OIBR3","Oi"
 "ORVR3","Orizon"
+"DASA3","Dasa"
+"VVEO3","Viveo"
 "IRBR3","IRB Brasil RE"
 "TASA4","Taurus"
 "EGIE3","Engie"
@@ -176,17 +190,22 @@ def get_reference_list():
 "PLPL3","Plano&Plano"
 "VULC3","Vulcabras"
 "SEER3","Ser Educacional"
+"ITUB3","Itaú Unibanco"
+"USIM3","Usiminas"
+"POMO3","Marcopolo"
 "EVEN3","Even"
 "SOJA3","Boa Safra Sementes"
 "ABCB4","Banco ABC Brasil"
 "FESA4","Ferbasa"
 "ENJU3","Enjoei"
+"AZEV3","Azevedo & Travassos"
 "MELK3","Melnick"
 "LIGT3","Light"
 "MDNE3","Moura Dubeux"
 "ALUP11","Alupar"
 "PGMN3","Pague Menos"
 "TFCO4","Track & Field"
+"VTRU3","VITRUBREPCOM"
 "JSLG3","JSL"
 "PINE4","Banco Pine"
 "MATD3","Mater Dei"
@@ -197,20 +216,27 @@ def get_reference_list():
 "LOGG3","LOG CP"
 "WIZC3","Wiz Soluções"
 "ZAMP3","Zamp"
+"TAEE4","Taesa"
 "PNVL3","Dimed"
 "LEVE3","Mahle Metal Leve"
 "TRIS3","Trisul"
-"LAVV3","Lavvi"
+"LAVV3","Lavvi Incorporadora"
 "FIQE3","Unifique"
 "PTBL3","Portobello"
 "PDGR3","PDG Realty"
+"RNEW4","Renova Energia"
+"BRBI11","BR Partners"
+"KLBN3","Klabin"
 "PRNR3","Priner"
 "PMAM3","Paranapanema"
 "BMOB3","Bemobi"
 "CSED3","Cruzeiro do Sul Educacional"
 "VITT3","Vittia"
 "GFSA3","Gafisa"
+"BRST3","Brisanet"
 "ETER3","Eternit"
+"RCSL3","Recrusul"
+"SAPR3","Sanepar"
 "MEAL3","IMC Alimentação"
 "DESK3","Desktop"
 "AGRO3","BrasilAgro"
@@ -219,55 +245,195 @@ def get_reference_list():
 "VLID3","Valid"
 "PFRM3","Profarma"
 "UCAS3","Unicasa"
-"AMAR3,"Lojas Marisa"
+"AMAR3","Lojas Marisa"
 "UNIP6","Unipar"
 "ROMI3","Indústrias ROMI"
+"IGTI3","Iguatemi"
+"IGTI3","Jereissati Participações"
+"SEQL3","Sequoia Logística"
+"TGMA3","Tegma"
+"TAEE3","Taesa"
+"CMIG3","Cemig"
+"DEXP3","Dexxos"
+"BRKM3","Braskem"
+"AMBP3","Ambipar"
+"TECN3","Technos"
+"AERI3","Aeris Energy"
+"ALPK3","Estapar"
+"FICT3","Fictor Alimentos"
+"OIBR4","Oi"
+"WHRL4","Whirlpool"
+"ITSA3","Itaúsa"
+"RNEW3","Renova Energia"
+"DMVF3","D1000 Varejo Farma"
+"OFSA3","Ourofino Saúde Animal"
+"LAND3","Terra Santa"
+"TCSA3","Tecnisa"
+"SANB3","Banco Santander"
+"EALT4","Electro Aço Altona"
 "VIVR3","Viver"
 "BRAP3","Bradespar"
 "EUCA4","Eucatex"
+"SANB4","Banco Santander"
 "CSUD3","CSU Cardsystem"
 "AGXY3","AgroGalaxy"
+"RAPT3","Randon"
 "LUPA3","Lupatech"
 "ALLD3","Allied"
+"PTNT4","Pettenati"
+"LVTC3","WDC Networks"
+"AMOB3","Automob"
+"DEXP4","Dexxos"
+"TRAD3","Traders Club"
+"SHOW3","Time For Fun"
+"INEP3","Inepar"
+"ALUP4","Alupar"
+"AALR3","Alliança"
+"WHRL3","Whirlpool"
+"FHER3","Fertilizantes Heringer"
+"NGRD3","Neogrid"
 "DOTZ3","Dotz"
+"VSTE3","LE LIS BLANC"
 "TASA3","Taurus"
 "BMEB4","Banco Mercantil do Brasil"
 "BIOM3","Biomm"
 "EPAR3","Embpar Participações"
+"PINE3","Banco Pine"
+"RSUL4","Metalúrgica Riosulense"
 "TELB4","Telebras"
+"GGBR3","Gerdau"
 "LOGN3","Log-In"
+"ENGI3","Energisa"
 "HOOT4","Hotéis Othon"
+"GOAU3","Metalúrgica Gerdau"
 "NUTR3","Nutriplant"
 "BRSR3","Banrisul"
+"REAG3","REAG3"
 "EMAE4","EMAE"
 "CLSC4","Celesc"
+"RNEW11","Renova Energia"
 "BOBR4","Bombril"
 "BAZA3","Banco da Amazônia"
+"ATED3","ATOM EDUCAÇÃO E EDITORA S.A."
 "BEES3","Banestes"
 "RSID3","Rossi Residencial"
+"ALUP3","Alupar"
 "WLMM4","WLM"
+"BAUH4","Excelsior"
+"CCTY3","RDVC CITY"
+"UNIP3","Unipar"
+"BGIP4","Banese"
 "CGRA4","Grazziotin"
+"EALT3","Electro Aço Altona"
+"PDTC3","Padtec"
+"FRIO3","Metalfrio"
+"CAMB3","Cambuci"
+"ENGI4","Energisa"
+"PTNT3","Pettenati"
+"EQPA3","Equatorial Energia Pará"
 "TPIS3","Triunfo"
 "RPMG3","Refinaria de Manguinhos"
 "AVLL3","Alphaville"
+"AMAR11","Lojas Marisa"
+"ISAE3","ISA Energia"
+"CEBR6","CEB"
+"WEST3","Westwing"
+"BSLI4","Banco de Brasília"
+"MGEL4","Mangels"
+"INEP4","Inepar"
+"LUPA11","LUPA11"
+"MTSA4","Metisa"
+"BEES4","Banestes"
+"AZEV11","Azevedo & Travassos"
+"BPAC5","Banco BTG Pactual"
+"EQMA3B","Equatorial Maranhão"
+"CEBR3","CEB"
+"CEED3","CEEE D"
+"CTSA3","Santanense"
+"RDNI3","RNI"
+"ENMT4","Energisa MT"
+"MNPR3","Minupar"
+"SCAR3","São Carlos"
+"CRPG5","Tronox Pigmentos"
+"CTSA4","Santanense"
+"HAGA3","Haga"
+"BPAC3","Banco BTG Pactual"
+"REDE3","Rede Energia"
+"HAGA4","Haga"
+"EKTR4","Elektro"
+"CEBR5","CEB"
+"ALPA3","Alpargatas"
 "AFLT3","Afluente T"
 "COCE5","Coelce"
+"CEDO3","Cedro Têxtil"
 "DTCY3","Dtcom"
 "JFEN3","João Fortes"
 "CGAS5","Comgás"
 "MNDL3","Mundial"
+"BRSR5","Banrisul"
 "LUXM4","Trevisa"
+"PPLA11","PPLA"
+"CGRA3","Grazziotin"
+"TELB3","Telebras"
+"IGTI4","Jereissati Participações"
+"IGTI4","Iguatemi"
+"BDLL3","Bardella"
+"BDLL4","Bardella"
+"DOHL4","Döhler"
+"BIED3","BIED3"
+"SNSY5","Sansuy"
+"BMKS3","Monark"
+"PSVM11","PORTO VM"
+"BMEB3","Banco Mercantil do Brasil"
+"OSXB3","OSX Brasil"
+"CPLE5","Copel"
+"CBEE3","Ampla Energia"
+"BMIN4","Banco Mercantil de Investimentos"
+"RPAD3","Alfa Holdings"
+"NEXP3","Brasil Brokers"
+"UNIP5","Unipar"
+"GEPA4","Rio Paranapanema Energia"
+"BSLI3","Banco de Brasília"
+"MOAR3","Monteiro Aranha"
+"BGIP3","Banese"
+"BALM4","Baumer"
+"CGAS3","Comgás"
+"EUCA3","Eucatex"
+"FIEI3","Fica"
+"RPAD5","Alfa Holdings"
+"MAPT3","Cemepe"
+"CEEB3","COELBA"
+"MAPT4","Cemepe"
+"PEAB4","Participações Aliança da Bahia"
+"EKTR3","Elektro"
+"CRPG3","Tronox Pigmentos"
+"TKNO3","Tekno"
+"SOND5","Sondotécnica"
+"MRSA5B","MRS Logística"
 "CEDO4","Cedro Têxtil"
 "CTKA4","Karsten"
+"AHEB3","São Paulo Turismo"
 "FESA3","Ferbasa"
+"TKNO4","Tekno"
 "PATI3","Panatlântica"
 "HBTS5","Habitasul"
-"NORD3","Nordon"
-"GSHP3","General Shopping & Outlets"
-"BNBR3","Banco do Nordeste"
-"PEAB3","Participações Aliança da Bahia"
+"SOND6","Sondotécnica"
+"PINE11","Banco Pine"
+"PLAS3","Plascar"
 "ESTR4","Estrela"
 "MWET4","Wetzel"
+"PATI4","Panatlântica"
+"NORD3","Nordon"
+"GSHP3","General Shopping & Outlets"
+"EQPA6","Equatorial Energia Pará"
+"BRKM6","Braskem"
+"BALM3","Baumer"
+"CRPG6","Tronox Pigmentos"
+"BNBR3","Banco do Nordeste"
+"MRSA3B","MRS Logística"
+"PEAB3","Participações Aliança da Bahia"
+"MRSA6B","MRS Logística"
+"CEEB5","COELBA"
 """
     
     df = pd.read_csv(io.StringIO(csv_data))
@@ -283,7 +449,9 @@ def get_cvm_master_data():
         response = requests.get(url, timeout=60)
         response.raise_for_status()
         cvm_data = pd.read_csv(io.StringIO(response.content.decode('latin-1')), sep=';', dtype=str)
-        cvm_data['normalized_name'] = cvm_data['DENOM_SOCIAL'].apply(normalize_company_name)
+        # Renomeia a coluna normalizada para evitar conflito no merge
+        cvm_data.rename(columns={'normalized_name': 'normalized_name_cvm'}, inplace=True)
+        cvm_data['normalized_name_cvm'] = cvm_data['DENOM_SOCIAL'].apply(normalize_company_name)
         print("Dados da CVM processados.")
         return cvm_data
     except Exception as e:
@@ -309,29 +477,47 @@ def run_etl():
 
         # FASE 2: TRANSFORMAÇÃO (ENRIQUECIMENTO)
         print("Enriquecendo dados com informações da CVM...")
-        df_merged = pd.merge(df_reference, df_cvm, on='normalized_name', how='left')
+        df_merged = pd.merge(df_reference, df_cvm, left_on='normalized_name', right_on='normalized_name_cvm', how='left')
         
-        df_final = df_merged.dropna(subset=['CNPJ_CIA', 'CD_CVM']).drop_duplicates(subset=['Ticker'])
-        print(f"{len(df_final)} empresas tiveram correspondência e foram enriquecidas com sucesso.")
+        df_enriched = df_merged.dropna(subset=['CNPJ_CIA', 'CD_CVM']).copy()
+        
+        # --- CORREÇÃO: GARANTIR UNICIDADE POR CVM_CODE ---
+        print("Agrupando tickers e garantindo unicidade por empresa...")
+        
+        df_enriched['CD_CVM'] = pd.to_numeric(df_enriched['CD_CVM'], errors='coerce')
+        df_final = df_enriched.dropna(subset=['CD_CVM'])
+        df_final['CD_CVM'] = df_final['CD_CVM'].astype(int)
+
+        agg_funcs = {
+            'Ticker': lambda x: list(x.unique()),
+            'Nome': 'first',
+            'DENOM_SOCIAL': 'first',
+            'CNPJ_CIA': 'first',
+            'SEGMENTO': 'first',
+            'DENOM_COMERCIAL': 'first'
+        }
+        df_final_agg = df_final.groupby('CD_CVM').agg(agg_funcs).reset_index()
+
+        print(f"{len(df_final_agg)} empresas únicas foram encontradas e enriquecidas.")
 
         # FASE 3: CARGA
         print("Limpando a tabela 'companies' (e tabelas dependentes)...")
         session.execute(text("TRUNCATE TABLE public.companies RESTART IDENTITY CASCADE;"))
         
-        print(f"Populando a tabela 'companies' com {len(df_final)} registros...")
+        print(f"Populando a tabela 'companies' com {len(df_final_agg)} registros...")
         
         companies_to_load = []
-        for _, row in df_final.iterrows():
-            # Limpa o CNPJ para ter apenas dígitos
+        for _, row in df_final_agg.iterrows():
             cnpj_cleaned = ''.join(filter(str.isdigit, row['CNPJ_CIA']))
             
             companies_to_load.append({
-                'cvm_code': int(row['CD_CVM']),
-                'company_name': row['DENOM_SOCIAL'], # Usando o nome oficial da CVM
-                'trade_name': row['Nome'], # Usando o nome mais amigável da lista de referência
+                'cvm_code': row['CD_CVM'],
+                'company_name': row['DENOM_SOCIAL'],
+                'trade_name': row['Nome'],
                 'cnpj': cnpj_cleaned,
-                'b3_listing_segment': row.get('SEGMENTO'), # O .get() evita erros se a coluna não existir
-                'is_b3_listed': True
+                'b3_listing_segment': row.get('SEGMENTO'),
+                'is_b3_listed': True,
+                'tickers': row['Ticker']
             })
         
         if companies_to_load:
