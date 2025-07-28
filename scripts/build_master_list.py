@@ -531,8 +531,18 @@ def run_etl():
         
         cleaned_load = []
         for record in records_to_load:
+            # FIX: Map list of tickers to 'tickers' (JSON) and first ticker to 'ticker' (String)
+            tickers_list = record.get('ticker', [])
+            record['tickers'] = tickers_list
+            record['ticker'] = tickers_list[0] if tickers_list else None
+            
             record['trade_name'] = record.get('trade_name') or record.get('company_name')
             record['is_b3_listed'] = True
+            
+            # Garante que o website não exceda o limite do modelo
+            if 'website' in record and record['website'] and len(record['website']) > 255:
+                record['website'] = record['website'][:255]
+                
             cleaned_record = {k: v for k, v in record.items() if k in valid_model_columns}
             cleaned_load.append(cleaned_record)
         
