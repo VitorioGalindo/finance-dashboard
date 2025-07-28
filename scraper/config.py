@@ -1,44 +1,34 @@
+# scraper/config.py
 import os
-from datetime import timedelta
+from dotenv import load_dotenv
 
-class Config:
-    # API Configuration
-    API_VERSION = "v1"
-    API_TITLE = "Mercado Brasil API"
-    API_DESCRIPTION = "API completa do mercado financeiro brasileiro"
-    
-    # External API Keys (from environment variables)
-    BRAPI_API_KEY = os.getenv("BRAPI_API_KEY", "demo_key")
-    PARTNR_API_KEY = os.getenv("PARTNR_API_KEY", "demo_key")
-    DADOS_MERCADO_API_KEY = os.getenv("DADOS_MERCADO_API_KEY", "demo_key")
-    
-    # External API URLs
-    BRAPI_BASE_URL = "https://brapi.dev/api"
-    PARTNR_BASE_URL = "https://data.partnr.ai/v2"
-    DADOS_MERCADO_BASE_URL = "https://api.dadosdemercado.com.br/v1"
-    
-    # Rate Limiting Configuration
-    RATE_LIMITS = {
-        'basic': '1000 per hour',
-        'professional': '10000 per hour', 
-        'enterprise': '100000 per hour'
-    }
-    
-    # Cache Configuration
-    CACHE_TTL = {
-        'quotes': 60,  # 1 minute
-        'company_data': 3600,  # 1 hour
-        'financial_statements': 86400,  # 24 hours
-        'news': 300,  # 5 minutes
-        'macro_indicators': 1800,  # 30 minutes
-    }
-    
-    # WebSocket Configuration
-    WEBSOCKET_MAX_CONNECTIONS = 50
-    
-    # Database Configuration
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_recycle": 300,
-        "pool_pre_ping": True,
-    }
+# Carrega as variáveis de ambiente do arquivo .env na raiz do projeto
+dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(dotenv_path=dotenv_path)
+
+# --- Configurações do Banco de Dados ---
+DB_USER = os.getenv("DB_USER", "default_user")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "default_password")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_NAME = os.getenv("DB_NAME", "default_db")
+DB_PORT = os.getenv("DB_PORT", "5432")
+
+# String de conexão do SQLAlchemy
+# Garante que o modo SSL seja 'require' para compatibilidade com serviços em nuvem
+DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require"
+
+# --- Configurações Gerais do Scraper ---
+LOG_LEVEL = "INFO"
+LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+# --- Configurações da CVM ---
+# URL base para o portal de dados abertos
+CVM_DADOS_ABERTOS_URL = "https://dados.cvm.gov.br/dados"
+
+# User-Agent para simular um navegador e evitar bloqueios
+REQUESTS_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+}
+
+# Ano inicial para a carga histórica de dados
+START_YEAR_HISTORICAL_LOAD = 2012
