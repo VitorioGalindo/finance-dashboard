@@ -1,19 +1,19 @@
-# scripts/build_master_list.py (Versão Definitiva com Lógica Profissional)
+# scripts/build_master_list.py (Versão Definitiva com Mapeamento e Agregação Dinâmica)
 import os
 import sys
 import pandas as pd
-import requests
-import zipfile
 import io
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
+import requests
+import zipfile
 
 # --- CONFIGURAÇÃO DE PATH ---
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scraper')))
-from models import Base, Company # Importa o modelo de destino
+from models import Base, Company
 
 def get_db_connection_string():
     load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -22,7 +22,6 @@ def get_db_connection_string():
     return f"postgresql+psycopg2://{user}:{pw}@{host}/{db}?sslmode=require"
 
 def get_reference_tickers():
-    print("Carregando a lista de tickers de referência...")
     csv_data = """"Ticker","Nome"
 "BBAS3","Banco do Brasil"
 "AZUL4","Azul"
@@ -424,12 +423,11 @@ def get_reference_tickers():
     df = pd.read_csv(io.StringIO(csv_data))
     return set(df['Ticker'].str.upper())
 
-def get_cvm_data():
-    """Baixa e processa os 3 arquivos necessários da CVM."""
-    print("Baixando dados da CVM...")
-    year = datetime.now().year
+def download_and_process_cvm_files():
+    """Baixa e processa os 3 arquivos necessários da CVM, mapeando colunas."""
+    print("Baixando e processando dados da CVM...")
     
-    # Mapeamento de Colunas (Fonte da Verdade)
+    # Mapeamento de Colunas (A Fonte da Verdade)
     CAD_MAP = {'CNPJ_CIA': 'cnpj', 'DENOM_SOCIAL': 'company_name', 'CD_CVM': 'cvm_code', 'SETOR_ATIV': 'b3_sector', 'ATIV_PRINC': 'main_activity', 'PAG_WEB': 'website', 'SIT': 'status'}
     FCA_VM_MAP = {'CNPJ_Companhia': 'cnpj', 'Codigo_Negociacao': 'ticker'}
     FCA_GERAL_MAP = {'CNPJ_Companhia': 'cnpj', 'Pagina_Web': 'website'}
@@ -444,33 +442,38 @@ def get_cvm_data():
         df_cad['cnpj'] = df_cad['cnpj'].str.replace(r'\D', '', regex=True)
 
         # Arquivo 2 e 3: ZIP do FCA
+        year = datetime.now().year
         df_fca_vm = pd.DataFrame()
         df_fca_geral = pd.DataFrame()
         
-        url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
-        res_fca = requests.get(url_fca, timeout=180)
-        if res_fca.status_code != 200:
-            year -= 1 # Tenta o ano anterior se o atual não estiver disponível
+        try:
             url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
             res_fca = requests.get(url_fca, timeout=180)
-        res_fca.raise_for_status()
-        
-        with zipfile.ZipFile(io.BytesIO(res_fca.content)) as z:
-            vm_filename = f"fca_cia_aberta_valor_mobiliario_{year}.csv"
-            geral_filename = f"fca_cia_aberta_geral_{year}.csv"
-            
-            if vm_filename in z.namelist():
-                with z.open(vm_filename) as f:
-                    df_fca_vm = pd.read_csv(f, sep=';', encoding='latin-1', dtype=str)
-                    df_fca_vm.rename(columns=FCA_VM_MAP, inplace=True)
-                    df_fca_vm['cnpj'] = df_fca_vm['cnpj'].str.replace(r'\D', '', regex=True)
-            
-            if geral_filename in z.namelist():
-                with z.open(geral_filename) as f:
-                    df_fca_geral = pd.read_csv(f, sep=';', encoding='latin-1', dtype=str)
-                    df_fca_geral.rename(columns=FCA_GERAL_MAP, inplace=True)
-                    df_fca_geral['cnpj'] = df_fca_geral['cnpj'].str.replace(r'\D', '', regex=True)
-        
+            if res_fca.status_code != 200:
+                year -= 1
+                url_fca = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
+                res_fca = requests.get(url_fca, timeout=180)
+            res_fca.raise_for_status()
+
+            with zipfile.ZipFile(io.BytesIO(res_fca.content)) as z:
+                vm_filename = f"fca_cia_aberta_valor_mobiliario_{year}.csv"
+                geral_filename = f"fca_cia_aberta_geral_{year}.csv"
+                
+                if vm_filename in z.namelist():
+                    with z.open(vm_filename) as f:
+                        df_fca_vm = pd.read_csv(f, sep=';', encoding='latin-1', dtype=str)
+                        df_fca_vm.rename(columns=FCA_VM_MAP, inplace=True)
+                        df_fca_vm['cnpj'] = df_fca_vm['cnpj'].str.replace(r'\D', '', regex=True)
+                
+                if geral_filename in z.namelist():
+                    with z.open(geral_filename) as f:
+                        df_fca_geral = pd.read_csv(f, sep=';', encoding='latin-1', dtype=str)
+                        df_fca_geral.rename(columns=FCA_GERAL_MAP, inplace=True)
+                        df_fca_geral['cnpj'] = df_fca_geral['cnpj'].str.replace(r'\D', '', regex=True)
+
+        except requests.exceptions.RequestException as e:
+            print(f"AVISO: Não foi possível baixar o arquivo FCA para o ano {year}. Dados como website podem ficar ausentes. Erro: {e}")
+
         print("Dados da CVM baixados e mapeados com sucesso.")
         return df_cad, df_fca_vm, df_fca_geral
 
@@ -479,7 +482,6 @@ def get_cvm_data():
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 def run_etl():
-    """Orquestra o processo de ETL para criar a lista mestra de empresas."""
     print("--- INICIANDO ETL DA LISTA MESTRA DE EMPRESAS (VERSÃO DEFINITIVA) ---")
     
     engine = create_engine(get_db_connection_string())
@@ -488,9 +490,11 @@ def run_etl():
 
     try:
         reference_tickers = get_reference_tickers()
-        df_cad, df_fca_vm, df_fca_geral = get_cvm_data()
+        df_cad, df_fca_vm, df_fca_geral = download_and_process_cvm_files()
 
-        if df_cad.empty or df_fca_vm.empty: return
+        if df_cad.empty or df_fca_vm.empty:
+            print("Dados essenciais da CVM (Cadastro e Valores Mobiliários) não puderam ser carregados. Abortando.")
+            return
 
         print("Enriquecendo e filtrando dados...")
         
@@ -499,8 +503,8 @@ def run_etl():
         # Merge 1: Junta dados cadastrais com os tickers filtrados
         df_merged = pd.merge(df_cad, df_fca_filtered[['cnpj', 'ticker']], on='cnpj', how='inner')
         
-        # Merge 2: Adiciona o website, se disponível
-        if not df_fca_geral.empty:
+        # Merge 2: Adiciona o website (se disponível)
+        if not df_fca_geral.empty and 'website' in df_fca_geral.columns:
             df_merged = pd.merge(df_merged, df_fca_geral[['cnpj', 'website']], on='cnpj', how='left')
 
         print("Agrupando tickers por empresa...")
@@ -513,26 +517,22 @@ def run_etl():
                 agg_funcs[col] = 'first'
         
         df_final_agg = df_merged.groupby('cnpj').agg(agg_funcs).reset_index()
-
+        
         df_final = df_final_agg[df_final_agg['status'] == 'ATIVO'].copy()
-        print(f"{len(df_final)} empresas únicas e ativas foram encontradas e enriquecidas.")
+        print(f"{len(df_final)} empresas da sua lista foram encontradas, estão ativas e foram enriquecidas.")
 
         print("Limpando a tabela 'companies'...")
         session.execute(text("TRUNCATE TABLE public.companies RESTART IDENTITY CASCADE;"))
         
         print(f"Populando a tabela 'companies' com {len(df_final)} registros...")
         
-        # Garante que apenas colunas existentes no modelo sejam passadas
         valid_model_columns = {c.name for c in Company.__table__.columns}
         records_to_load = df_final.to_dict(orient='records')
         
         cleaned_load = []
         for record in records_to_load:
-            # Garante que 'trade_name' tenha um valor
             record['trade_name'] = record.get('trade_name') or record.get('company_name')
-            # Adiciona campos que o modelo espera
             record['is_b3_listed'] = True
-            # Filtra apenas as colunas válidas
             cleaned_record = {k: v for k, v in record.items() if k in valid_model_columns}
             cleaned_load.append(cleaned_record)
         
