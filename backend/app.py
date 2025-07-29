@@ -1,5 +1,5 @@
 # backend/app.py
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from backend.config import Config
 from backend import db
@@ -19,14 +19,24 @@ def create_app():
     from backend.routes.documents_routes import documents_bp
     from backend.routes.tickers_routes import tickers_bp
     from backend.routes.financials_routes import financials_bp
+    from backend.routes.market_routes import market_bp
 
     app.register_blueprint(companies_bp, url_prefix='/api')
     app.register_blueprint(documents_bp, url_prefix='/api')
     app.register_blueprint(tickers_bp, url_prefix='/api')
     app.register_blueprint(financials_bp, url_prefix='/api')
+    app.register_blueprint(market_bp, url_prefix='/api')
 
     @app.route('/')
     def index():
         return "Backend do Dashboard Financeiro está funcionando!"
+
+    @app.route('/health')
+    def health_check():
+        return jsonify({
+            "status": "healthy",
+            "service": "Finance Dashboard Backend",
+            "version": "1.0.0"
+        })
 
     return app
