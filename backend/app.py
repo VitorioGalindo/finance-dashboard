@@ -1,4 +1,4 @@
-# backend/app.py
+# backend/app.py - VERSÃO CORRIGIDA
 from flask import Flask, jsonify
 from flask_cors import CORS
 from backend.config import Config
@@ -15,17 +15,35 @@ def create_app():
     db.init_app(app)
 
     # Importa e registra os blueprints DENTRO da função de fábrica
-    from backend.routes.companies_routes import companies_bp
-    from backend.routes.documents_routes import documents_bp
-    from backend.routes.tickers_routes import tickers_bp
-    from backend.routes.financials_routes import financials_bp
-    from backend.routes.market_routes import market_bp
+    try:
+        from backend.routes.companies_routes import companies_bp
+        app.register_blueprint(companies_bp, url_prefix='/api')
+    except ImportError as e:
+        print(f"Aviso: Não foi possível importar companies_routes: {e}")
 
-    app.register_blueprint(companies_bp, url_prefix='/api')
-    app.register_blueprint(documents_bp, url_prefix='/api')
-    app.register_blueprint(tickers_bp, url_prefix='/api')
-    app.register_blueprint(financials_bp, url_prefix='/api')
-    app.register_blueprint(market_bp, url_prefix='/api')
+    try:
+        from backend.routes.documents_routes import documents_bp
+        app.register_blueprint(documents_bp, url_prefix='/api')
+    except ImportError as e:
+        print(f"Aviso: Não foi possível importar documents_routes: {e}")
+
+    try:
+        from backend.routes.tickers_routes import tickers_bp
+        app.register_blueprint(tickers_bp, url_prefix='/api')
+    except ImportError as e:
+        print(f"Aviso: Não foi possível importar tickers_routes: {e}")
+
+    try:
+        from backend.routes.financials_routes import financials_bp
+        app.register_blueprint(financials_bp, url_prefix='/api')
+    except ImportError as e:
+        print(f"Aviso: Não foi possível importar financials_routes: {e}")
+
+    try:
+        from backend.routes.market_routes import market_bp
+        app.register_blueprint(market_bp, url_prefix='/api')
+    except ImportError as e:
+        print(f"Aviso: Não foi possível importar market_routes: {e}")
 
     @app.route('/')
     def index():
